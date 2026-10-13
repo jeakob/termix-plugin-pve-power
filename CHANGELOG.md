@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.7
+
+### Changed
+
+- Explain what the plugin does and the problem it solves in the README.
+- Remove an unused packaging script.
+
+
 ## 0.6.6
 
 ### Changed

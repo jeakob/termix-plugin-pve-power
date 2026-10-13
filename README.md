@@ -2,6 +2,20 @@
 
 Save and start multiple QEMU VMs or LXC containers from Termix. Each started guest gets its own shutdown monitor, which requests a graceful shutdown after either five consecutive low CPU readings or a maximum guest uptime. CPU checks run once per minute after a ten-minute boot grace period. A threshold or uptime value of `0` disables that rule.
 
+## What it does
+
+- Starts and gracefully shuts down linked Proxmox VMs and LXC containers from Termix.
+- Starts a stopped guest when you choose **Start Proxmox guest and connect**, then opens its SSH terminal when it is ready.
+- Monitors guests you start or explicitly choose to monitor, and requests shutdown after sustained low CPU usage or the configured maximum uptime.
+- Shows guest status, CPU use, uptime, and the shutdown countdown in Termix.
+- Provides authenticated API endpoints so automation services can start or stop saved guests.
+
+## The problem it solves
+
+- Starting an on-demand guest otherwise means leaving Termix to start it in Proxmox, then returning to Termix to connect over SSH.
+- Guests left running can keep using host resources after they are no longer needed. Per-guest idle and uptime rules can request a graceful shutdown automatically.
+- Scripts and automation services need a way to control guests without exposing an unauthenticated webhook. The plugin uses Termix API authentication for these requests.
+
 ## Install
 
 1. Use Termix **v26.10.0 or newer** and enable Plugin developer mode in Settings → General.
