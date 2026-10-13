@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.8
+
+### Changed
+
+- Add screenshots and a usage guide to the docs.
+- Move all interface text into `locales/en.json`, ready for translation.
+- Document every API route with OpenAPI.
+- Remove an unneeded import query from the shutdown policy module.
+
+
 ## 0.6.7
 
 ### Changed

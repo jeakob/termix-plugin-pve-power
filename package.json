@@ -1,6 +1,6 @@
 {
   "name": "termix-plugin-pve-power",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@termix-ssh/plugin-sdk": "^1.0.6",
+    "sonner": "^2.0.8",
     "vitest": "^4.1.11"
   }
 }

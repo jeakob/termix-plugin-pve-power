@@ -2,6 +2,12 @@
 
 Save and start multiple QEMU VMs or LXC containers from Termix. Each started guest gets its own shutdown monitor, which requests a graceful shutdown after either five consecutive low CPU readings or a maximum guest uptime. CPU checks run once per minute after a ten-minute boot grace period. A threshold or uptime value of `0` disables that rule.
 
+![Proxmox Power tab with a saved stopped guest and a running guest counting down to automatic shutdown](docs/img/screenshot.png)
+
+Linked hosts get three actions in the host list: **Start Proxmox guest and connect**, **Start Proxmox guest** and **Shut down Proxmox guest**.
+
+![Host row with the plugin's connect, start and shut down icons next to the terminal icon](docs/img/host-row.png)
+
 ## What it does
 
 - Starts and gracefully shuts down linked Proxmox VMs and LXC containers from Termix.

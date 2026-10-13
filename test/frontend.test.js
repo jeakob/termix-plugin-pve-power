@@ -2,6 +2,24 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "vitest";
 
+const locale = JSON.parse(readFileSync(new URL("../locales/en.json", import.meta.url), "utf8"));
+const lookup = key => key.split(".").reduce((node, part) => node?.[part], locale);
+// Mirrors i18next: `count` picks the _one/_other form, {{name}} is filled from options.
+const t = (key, options = {}) => {
+  const text = lookup("count" in options ? `${key}_${options.count === 1 ? "one" : "other"}` : key) ?? lookup(key);
+  assert.equal(typeof text, "string", `missing locale key ${key}`);
+  return text.replace(/{{(\w+)}}/g, (_, name) => String(options[name]));
+};
+
+test("every frontend locale key exists in en.json", () => {
+  const source = readFileSync(new URL("../src/frontend/index.js", import.meta.url), "utf8");
+  const keys = [...source.matchAll(/(?:\bt|titleKey:)\(?\s*"([a-zA-Z.]+)"/g)].map(match => match[1]);
+  // Keys picked at runtime: `status.${...}` and the guest type labels.
+  keys.push("status.checking", "status.starting", "status.running", "status.stopped", "status.stopping");
+  assert.ok(keys.length > 40);
+  for (const key of keys) assert.equal(typeof (lookup(key) ?? lookup(`${key}_one`)), "string", `missing locale key ${key}`);
+});
+
 test("host click fetches the current guest link before opening SSH", async () => {
   const calls = [];
   const actions = {};
@@ -41,7 +59,7 @@ test("host click fetches the current guest link before opening SSH", async () =>
     .replace('import { toast } from "sonner";', 'const { toast } = globalThis.__pveMocks.sonner;');
   globalThis.__pveMocks = {
     React,
-    frontend: { usePermission() {}, usePluginApi() { return api; }, useTranslation() {} },
+    frontend: { usePermission() {}, usePluginApi() { return api; }, useTranslation() { return { t }; } },
     ui: { PanelShell() {} },
     sonner: { toast: { success(text) { toasts.push(text); }, error(text) { toasts.push(`error: ${text}`); } } },
   };
@@ -51,7 +69,7 @@ test("host click fetches the current guest link before opening SSH", async () =>
   await module.activate({
     hasPermission: async () => false,
     registerRailItem() {}, registerTab(type, component) { if (type.endsWith("-connect")) wakeTab = component; }, registerHostAction(value) { actions[value.id] = value; },
-    api,
+    api, t,
   });
   const action = actions["pve-power.connect"];
   assert.equal(action.when({ id: 74, enableSsh: true }), true);

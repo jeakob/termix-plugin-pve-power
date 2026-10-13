@@ -1,7 +1,6 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-// Keep the policy module fresh when Termix replaces a plugin without restarting Node.
-import { evaluate, validateConfig } from "./policy.js?v=0.5.2";
+import { evaluate, validateConfig } from "./policy.js";
 
 function run(client, command) {
   return new Promise((resolve, reject) => {
@@ -137,7 +136,80 @@ export async function activate(ctx) {
 
   const router = ctx.http.router();
   router.use(ctx.rbac.require("use"));
+  /**
+   * @openapi
+   * components:
+   *   schemas:
+   *     PvePowerConfig:
+   *       type: object
+   *       required: [hostId, node, vmid, type, idleCpuPercent, maxUptimeMinutes]
+   *       properties:
+   *         hostId: { type: integer, description: Termix host of the Proxmox node }
+   *         node: { type: string, description: Proxmox node name }
+   *         vmid: { type: integer, minimum: 100 }
+   *         type: { type: string, enum: [qemu, lxc] }
+   *         connectionHostId: { type: integer, nullable: true, description: Termix host that starts this guest on connect }
+   *         idleCpuPercent: { type: integer, minimum: 0, maximum: 100, description: 0 disables the idle CPU rule }
+   *         maxUptimeMinutes: { type: integer, minimum: 0, maximum: 525600, description: 0 disables the uptime rule }
+   *     PvePowerStart:
+   *       allOf:
+   *         - $ref: '#/components/schemas/PvePowerConfig'
+   *         - type: object
+   *           properties:
+   *             allowRunning: { type: boolean, description: Return success instead of 409 when the guest already runs }
+   *     PvePowerKey:
+   *       type: object
+   *       required: [key]
+   *       properties:
+   *         key: { type: string, description: Guest key from GET /plugin-api/pve-power/vm }
+   *     PvePowerGuests:
+   *       type: object
+   *       properties:
+   *         guests:
+   *           type: array
+   *           items:
+   *             type: object
+   *             properties:
+   *               key: { type: string }
+   *               config: { $ref: '#/components/schemas/PvePowerConfig' }
+   *               armed: { type: object, nullable: true, description: Set while automatic shutdown is armed }
+   *               last: { type: object, nullable: true, description: Last status, CPU, uptime and error }
+   */
+  /**
+   * @openapi
+   * /plugin-api/pve-power/vm:
+   *   get:
+   *     summary: List saved guests and their last status
+   *     description: Needs the Proxmox Power use permission.
+   *     tags:
+   *       - Proxmox Power
+   *     responses:
+   *       200:
+   *         description: The saved guests
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/PvePowerGuests'
+   */
   router.get("/vm", (_req, res) => res.json(view()));
+  /**
+   * @openapi
+   * /plugin-api/pve-power/refresh:
+   *   post:
+   *     summary: Check the status of every guest that is not being monitored
+   *     description: Needs the Proxmox Power manage permission.
+   *     tags:
+   *       - Proxmox Power
+   *     responses:
+   *       200:
+   *         description: The saved guests
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/PvePowerGuests'
+   *       409:
+   *         description: Another guest check is in progress or the guest is in the wrong state
+   */
   router.post("/refresh", ctx.rbac.require("manage"), async (_req, res) => {
     if (busy) return res.status(409).json({ error: "Guest check in progress" });
     busy = true;
@@ -160,6 +232,18 @@ export async function activate(ctx) {
     } catch (error) { res.status(500).json({ error: `Could not refresh guests: ${error.message}` }); }
     finally { busy = false; }
   });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/hosts:
+   *   get:
+   *     summary: List the SSH hosts this user can pick as Proxmox or connection hosts
+   *     description: Needs the Proxmox Power use permission.
+   *     tags:
+   *       - Proxmox Power
+   *     responses:
+   *       200:
+   *         description: Hosts with id, name and whether Proxmox Power is enabled on them
+   */
   router.get("/hosts", async (_req, res) => {
     try {
       const hosts = await ctx.hosts.list();
@@ -167,6 +251,28 @@ export async function activate(ctx) {
         .map(({ id, name, pluginSettings }) => ({ id, name, proxmox: pluginSettings?.proxmox?.enableProxmox === true && pluginSettings?.["pve-power"]?.enabled === true })));
     } catch (error) { res.status(500).json({ error: error.message }); }
   });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/vms:
+   *   get:
+   *     summary: List the VMs and containers on a Proxmox host
+   *     description: Needs the Proxmox Power use permission and manage access to the host.
+   *     tags:
+   *       - Proxmox Power
+   *     parameters:
+   *       - in: query
+   *         name: hostId
+   *         required: true
+   *         schema:
+   *           type: integer
+   *     responses:
+   *       200:
+   *         description: Guests with type, vmid, node, name and status
+   *       400:
+   *         description: Invalid host ID
+   *       502:
+   *         description: Proxmox could not be reached
+   */
   router.get("/vms", async (req, res) => {
     const hostId = Number(req.query.hostId);
     if (!Number.isSafeInteger(hostId) || hostId <= 0) return res.status(400).json({ error: "Choose a valid Termix host" });
@@ -178,6 +284,32 @@ export async function activate(ctx) {
         .map(({ type, vmid, node, name, status }) => ({ type, vmid, node, name: name || `${type === "lxc" ? "CT" : "VM"} ${vmid}`, status })));
     } catch (error) { res.status(502).json({ error: error.message }); }
   });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/config:
+   *   post:
+   *     summary: Save a guest and its shutdown rules
+   *     description: Needs the Proxmox Power manage permission.
+   *     tags:
+   *       - Proxmox Power
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/PvePowerConfig'
+   *     responses:
+   *       200:
+   *         description: The saved guests
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/PvePowerGuests'
+   *       400:
+   *         description: Invalid settings
+   *       409:
+   *         description: Another guest check is in progress or the guest is in the wrong state
+   */
   router.post("/config", ctx.rbac.require("manage"), async (req, res) => {
     if (busy) return res.status(409).json({ error: "Guest check in progress" });
     let config;
@@ -200,6 +332,34 @@ export async function activate(ctx) {
       res.status(500).json({ error: `Could not save guest: ${error.message}` });
     } finally { busy = false; }
   });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/start:
+   *   post:
+   *     summary: Start a guest and arm its automatic shutdown
+   *     description: Needs the Proxmox Power manage permission.
+   *     tags:
+   *       - Proxmox Power
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/PvePowerStart'
+   *     responses:
+   *       200:
+   *         description: The saved guests
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/PvePowerGuests'
+   *       400:
+   *         description: Invalid settings
+   *       409:
+   *         description: Another guest check is in progress or the guest is in the wrong state
+   *       502:
+   *         description: Proxmox could not start the guest
+   */
   router.post("/start", ctx.rbac.require("manage"), async (req, res) => {
     if (busy) return res.status(409).json({ error: "Guest check in progress" });
     let config;
@@ -244,6 +404,26 @@ export async function activate(ctx) {
       res.status(502).json({ error: `Could not start guest: ${error.message}` });
     } finally { busy = false; }
   });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/ssh-ready:
+   *   post:
+   *     summary: Check whether a started guest accepts SSH on its connection host
+   *     description: Needs the Proxmox Power manage permission.
+   *     tags:
+   *       - Proxmox Power
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/PvePowerKey'
+   *     responses:
+   *       200:
+   *         description: "{ ready: boolean }"
+   *       404:
+   *         description: Guest has no connection host
+   */
   router.post("/ssh-ready", ctx.rbac.require("manage"), async (req, res) => {
     const guest = state.guests.find(item => item.key === req.body?.key);
     if (!guest?.config.connectionHostId) return res.status(404).json({ error: "Guest has no connection host" });
@@ -261,6 +441,32 @@ export async function activate(ctx) {
     } catch { res.json({ ready: false }); }
     finally { clearTimeout(timer); }
   });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/adopt:
+   *   post:
+   *     summary: Arm automatic shutdown for a guest that is already running
+   *     description: Needs the Proxmox Power manage permission.
+   *     tags:
+   *       - Proxmox Power
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/PvePowerKey'
+   *     responses:
+   *       200:
+   *         description: The saved guests
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/PvePowerGuests'
+   *       404:
+   *         description: Guest not found
+   *       409:
+   *         description: Another guest check is in progress or the guest is in the wrong state
+   */
   router.post("/adopt", ctx.rbac.require("manage"), async (req, res) => {
     if (busy) return res.status(409).json({ error: "Guest check in progress" });
     const guest = state.guests.find(item => item.key === req.body?.key);
@@ -279,6 +485,34 @@ export async function activate(ctx) {
     } catch (error) { res.status(502).json({ error: `Could not monitor guest: ${error.message}` }); }
     finally { busy = false; }
   });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/stop:
+   *   post:
+   *     summary: Request a graceful shutdown of a guest
+   *     description: Needs the Proxmox Power manage permission.
+   *     tags:
+   *       - Proxmox Power
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/PvePowerKey'
+   *     responses:
+   *       200:
+   *         description: The saved guests
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/PvePowerGuests'
+   *       404:
+   *         description: Guest not found
+   *       409:
+   *         description: Another guest check is in progress or the guest is in the wrong state
+   *       502:
+   *         description: Proxmox could not shut down the guest
+   */
   router.post("/stop", ctx.rbac.require("manage"), async (req, res) => {
     if (busy) return res.status(409).json({ error: "Guest check in progress" });
     const guest = state.guests.find(item => item.key === req.body?.key);
@@ -301,6 +535,32 @@ export async function activate(ctx) {
     } catch (error) { res.status(502).json({ error: `Could not stop guest: ${error.message}` }); }
     finally { busy = false; }
   });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/disarm:
+   *   post:
+   *     summary: Cancel automatic shutdown for a guest
+   *     description: Needs the Proxmox Power manage permission.
+   *     tags:
+   *       - Proxmox Power
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/PvePowerKey'
+   *     responses:
+   *       200:
+   *         description: The saved guests
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/PvePowerGuests'
+   *       404:
+   *         description: Guest not found
+   *       409:
+   *         description: Another guest check is in progress or the guest is in the wrong state
+   */
   router.post("/disarm", ctx.rbac.require("manage"), async (req, res) => {
     if (busy) return res.status(409).json({ error: "Guest check in progress" });
     const guest = state.guests.find(item => item.key === req.body?.key);
@@ -316,6 +576,32 @@ export async function activate(ctx) {
       res.status(500).json({ error: `Could not cancel monitoring: ${error.message}` });
     } finally { busy = false; }
   });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/remove:
+   *   post:
+   *     summary: Remove a saved guest
+   *     description: Needs the Proxmox Power manage permission.
+   *     tags:
+   *       - Proxmox Power
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/PvePowerKey'
+   *     responses:
+   *       200:
+   *         description: The saved guests
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/PvePowerGuests'
+   *       404:
+   *         description: Guest not found
+   *       409:
+   *         description: Another guest check is in progress or the guest is in the wrong state
+   */
   router.post("/remove", ctx.rbac.require("manage"), async (req, res) => {
     if (busy) return res.status(409).json({ error: "Guest check in progress" });
     const guest = state.guests.find(item => item.key === req.body?.key);

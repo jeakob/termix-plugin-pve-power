@@ -1,6 +1,90 @@
 {
   "tab": {
-    "title": "Proxmox Power"
+    "title": "Proxmox Power",
+    "intro": "Start a saved VM or container, or monitor one already running. Automatic shutdown uses five low CPU checks after 10 minutes, or the uptime limit you set.",
+    "outdated": "Termix is still running an older plugin backend. Restart the Termix server to load this update."
+  },
+  "webhooks": {
+    "title": "Webhook integrations",
+    "auth": "Automation services can control guests through the authenticated Termix API. Create a Termix API key for a user with Proxmox Power manage permission, then configure your service to send JSON POST requests.",
+    "routes": "Start a guest: POST /plugin-api/pve-power/start with that guest’s config from GET /plugin-api/pve-power/vm. Stop a guest gracefully: POST /plugin-api/pve-power/stop with { \"key\": \"<guest key>\" } from the same response.",
+    "headers": "Send Authorization: Bearer <Termix API key> and Content-Type: application/json. These routes require Termix authentication; this plugin does not expose a public unauthenticated webhook URL."
+  },
+  "setup": {
+    "title": "Guest setup",
+    "description": "Choose a Proxmox guest and its shutdown rules.",
+    "proxmoxHost": "Termix Proxmox host",
+    "selectHost": "Select a host",
+    "hostOption": "{{name}} (ID {{id}})",
+    "guest": "VM or LXC container",
+    "selectGuest": "Select a guest",
+    "noGuests": "No guests found",
+    "guestOption": "{{name}} ({{guest}}, {{node}})",
+    "connectionHost": "Termix connection host · optional",
+    "noAutoStart": "No automatic start on connect",
+    "connectionHelp": "Connecting to this SSH host starts the selected guest if it is stopped.",
+    "idleCpu": "Idle CPU threshold (%) · 0 disables",
+    "maxUptime": "Maximum guest uptime (minutes) · 0 disables",
+    "save": "Save guest",
+    "start": "Start selected guest",
+    "monitor": "Monitor selected guest"
+  },
+  "guest": {
+    "lxc": "CT {{vmid}}",
+    "qemu": "VM {{vmid}}"
+  },
+  "guests": {
+    "title": "Saved guests",
+    "configured_one": "{{count}} configured",
+    "configured_other": "{{count}} configured",
+    "empty": "No guests saved yet. Choose a host and guest to get started.",
+    "host": "Host {{id}}",
+    "connectionHost": "host {{id}}",
+    "startsOnConnect": "Starts when connecting to {{host}}",
+    "cpu": "CPU {{percent}}%",
+    "uptime": "Uptime {{minutes}} min",
+    "countdown": "Uptime shutdown in",
+    "limitReached": "Limit reached. Shutdown is due on the next check.",
+    "lowCpuSooner": "Low CPU may trigger shutdown sooner.",
+    "idleChecks": "Low CPU checks {{count}}/5",
+    "checkFailed": "Check failed: {{error}}",
+    "stopRequested": "Graceful shutdown requested. Waiting for Proxmox to confirm the stop.",
+    "armed": "Automatic shutdown armed",
+    "off": "Automatic shutdown off"
+  },
+  "status": {
+    "checking": "Checking status",
+    "starting": "starting",
+    "running": "running",
+    "stopped": "stopped",
+    "stopping": "Shutting down"
+  },
+  "actions": {
+    "start": "Start guest",
+    "monitor": "Monitor guest",
+    "stop": "Stop guest",
+    "edit": "Edit",
+    "disarm": "Cancel auto shutdown",
+    "remove": "Remove"
+  },
+  "confirm": {
+    "monitor": "Monitor this running guest? Its current uptime is about {{minutes}} minutes.",
+    "monitorLimit": "Monitor this running guest? Its current uptime is about {{minutes}} minutes. The {{limit}}-minute limit may request shutdown on the next check.",
+    "stop": "Request a graceful shutdown for {{guest}}? Work in the guest may be interrupted.",
+    "hostStop": "Request a graceful shutdown for {{guest}}? Open sessions to {{host}} will be closed.",
+    "thisHost": "this host"
+  },
+  "wake": {
+    "connecting": "Checking guest and connecting…",
+    "waiting": "Guest started, waiting for SSH…",
+    "failed": "Could not connect",
+    "retry": "Retry"
+  },
+  "toast": {
+    "notLinked": "No Proxmox guest is linked to this host",
+    "started": "Started {{guest}}",
+    "alreadyRunning": "{{guest}} is already running",
+    "stopRequested": "Graceful shutdown requested for {{guest}}"
   },
   "hostAction": {
     "title": "Start Proxmox guest and connect",
