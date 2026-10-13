@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.9
+
+### Fixed
+
+- The Proxmox host list in guest setup was empty. Hosts now appear when **Proxmox Power** is enabled in their host editor; the bundled Proxmox Integration switch is no longer required. Guest setup now says this under the host field.
+
+### Changed
+
+- Both shutdown rules can be 0, so a guest can be started and stopped without automatic shutdown.
+
+
 ## 0.6.8
 
 ### Changed

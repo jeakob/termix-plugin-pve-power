@@ -185,8 +185,8 @@ function VmTab() {
                 onChange: event => setForm({ ...form, hostId: event.target.value, node: "", vmid: "", type: "qemu", connectionHostId: "" }) },
                 h("option", { value: "" }, t("setup.selectHost")),
                 ...hosts.filter(host => host.proxmox).map(host => h("option", { key: host.id, value: host.id }, t("setup.hostOption", { name: host.name, id: host.id })))
-              )
-            ),
+              ),
+              h("small", null, t("setup.proxmoxHostHelp"))),
             h("label", { className: "pve-field" },
               h("span", null, t("setup.guest")),
               h("select", { className: control, required: true,

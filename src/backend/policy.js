@@ -41,6 +41,5 @@ export function validateConfig(input) {
   if (!Number.isSafeInteger(vmid) || vmid < 100 || vmid > 999999999) throw new Error("Choose a valid VM ID");
   if (!Number.isInteger(idleCpuPercent) || idleCpuPercent < 0 || idleCpuPercent > 100) throw new Error("CPU threshold must be 0 to 100 percent");
   if (!Number.isInteger(maxUptimeMinutes) || maxUptimeMinutes < 0 || maxUptimeMinutes > 525600) throw new Error("Maximum uptime must be 0 to 525600 minutes");
-  if (idleCpuPercent === 0 && maxUptimeMinutes === 0) throw new Error("Enable at least one shutdown rule");
   return { hostId, node, vmid, type, connectionHostId, idleCpuPercent, maxUptimeMinutes };
 }

@@ -27,7 +27,7 @@ Linked hosts get three actions in the host list: **Start Proxmox guest and conne
 1. Use Termix **v26.10.0 or newer** and enable Plugin developer mode in Settings → General.
 2. Download the latest `pve-power-*.tmxplug` file from [Releases](https://github.com/jeakob/termix-plugin-pve-power/releases/latest).
 3. In Termix, open **Plugins → Install from file** and select the downloaded file. Grant the capabilities listed below when prompted.
-4. Add the Proxmox node as a normal SSH host in Termix. In the host editor, enable both **Proxmox Integration** and **Proxmox Power**. Its SSH account must be permitted to run `pvesh` for this guest.
+4. Add the Proxmox node as a normal SSH host in Termix. In the host editor, enable **Proxmox Power**. Its SSH account must be permitted to run `pvesh` for this guest.
 5. Open the **Proxmox Power** tab, select a Termix Proxmox host and a QEMU VM or LXC container by name, then press **Save guest** or **Start selected guest**. To start a guest when you open its Termix SSH host, also select **Termix connection host** before saving. Saved guests show their current status when the tab opens and refresh once a minute. A running guest can be added to automatic shutdown with **Monitor guest**, or shut down immediately with **Stop guest**.
 
 ### Capabilities

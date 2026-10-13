@@ -42,5 +42,5 @@ test("invalid configuration cannot reach command construction", () => {
   assert.throws(() => validateConfig({ ...config, type: "lxc;shutdown" }));
   assert.throws(() => validateConfig({ ...config, connectionHostId: 0 }));
   assert.throws(() => validateConfig({ ...config, connectionHostId: config.hostId }));
-  assert.throws(() => validateConfig({ ...config, idleCpuPercent: 0, maxUptimeMinutes: 0 }));
+  assert.equal(validateConfig({ ...config, idleCpuPercent: 0, maxUptimeMinutes: 0 }).maxUptimeMinutes, 0);
 });

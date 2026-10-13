@@ -247,8 +247,8 @@ export async function activate(ctx) {
   router.get("/hosts", async (_req, res) => {
     try {
       const hosts = await ctx.hosts.list();
-      res.json(hosts.filter(host => host.enableSsh === true && (host.connectionType === "ssh" || !host.connectionType))
-        .map(({ id, name, pluginSettings }) => ({ id, name, proxmox: pluginSettings?.proxmox?.enableProxmox === true && pluginSettings?.["pve-power"]?.enabled === true })));
+      // list() only carries a summary, so read this plugin's own host switch.
+      res.json(await Promise.all(hosts.map(async ({ id, name }) => ({ id, name, proxmox: await ctx.settings.getHost(id, "enabled") === true }))));
     } catch (error) { res.status(500).json({ error: error.message }); }
   });
   /**

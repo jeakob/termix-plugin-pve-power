@@ -7,7 +7,7 @@ Start Proxmox VMs and LXC containers from Termix, and shut them down gracefully 
 ## Turn it on
 
 1. Add the Proxmox node as a normal SSH host in Termix. Its SSH account must be allowed to run `pvesh`.
-2. In that host's editor, enable **Proxmox Integration** and **Proxmox Power**.
+2. In that host's editor, enable **Proxmox Power**.
 
 ## Save a guest
 
