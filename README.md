@@ -5,8 +5,10 @@ Save and start multiple QEMU VMs or LXC containers from Termix. Each started gue
 ## Install
 
 1. Use Termix **v26.10.0 or newer** and enable Plugin developer mode in Settings → General.
-2. Run `npm run build` and then `npm run pack` in this directory. This creates `pve-power-0.6.6.tmxplug`.
-3. In Termix, install the plugin from that file. Grant the capabilities listed below when prompted.
+2. Download the latest `pve-power-*.tmxplug` file from [Releases](https://github.com/jeakob/termix-plugin-pve-power/releases/latest).
+3. In Termix, open **Plugins → Install from file** and select the downloaded file. Grant the capabilities listed below when prompted.
+4. Add the Proxmox node as a normal SSH host in Termix. In the host editor, enable both **Proxmox Integration** and **Proxmox Power**. Its SSH account must be permitted to run `pvesh` for this guest.
+5. Open the **Proxmox Power** tab, select a Termix Proxmox host and a QEMU VM or LXC container by name, then press **Save guest** or **Start selected guest**. To start a guest when you open its Termix SSH host, also select **Termix connection host** before saving. Saved guests show their current status when the tab opens and refresh once a minute. A running guest can be added to automatic shutdown with **Monitor guest**, or shut down immediately with **Stop guest**.
 
 ### Capabilities
 
@@ -16,8 +18,6 @@ Save and start multiple QEMU VMs or LXC containers from Termix. Each started gue
 - `ssh:connect` and `credentials:use` let the plugin run Proxmox `pvesh` commands through Termix’s SSH connection and saved authentication; the plugin does not read credential values.
 - `users:impersonate` lets scheduled shutdown checks run as the user who armed monitoring, preserving that user’s access to the host.
 - `ui:surface` adds the Proxmox Power tab and linked-host actions.
-4. Add the Proxmox node as a normal SSH host in Termix. In the host editor, enable both **Proxmox Integration** and **Proxmox Power**. Its SSH account must be permitted to run `pvesh` for this guest.
-5. Open the **Proxmox Power** tab, select a Termix Proxmox host and a QEMU VM or LXC container by name, then press **Save guest** or **Start selected guest**. To start a guest when you open its Termix SSH host, also select **Termix connection host** before saving. Saved guests show their current status when the tab opens and refresh once a minute. A running guest can be added to automatic shutdown with **Monitor guest**, or shut down immediately with **Stop guest**.
 
 This plugin was previously named Proxmox Guest On Demand (`pve-guest-on-demand`). The new ID has its own settings, so save guests again after switching and uninstall the old plugin.
 
@@ -35,4 +35,4 @@ Automation services can control saved guests through the authenticated Termix AP
 
 ## Development
 
-The code is plain ESM in `dist/` so it can be packaged without an npm download. `npm test` checks the shutdown policy and guest control routes. The host action has been exercised against a live Termix/Proxmox install; browser rendering has not been checked here.
+To build the plugin locally, run `npm ci`, `npm run build`, `npm run validate`, then `npm run pack`. `npm test` runs the shutdown policy and guest control route tests.
