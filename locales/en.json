@@ -1,0 +1,28 @@
+{
+  "tab": {
+    "title": "Proxmox Power"
+  },
+  "hostAction": {
+    "title": "Start Proxmox guest and connect",
+    "start": "Start Proxmox guest",
+    "shutdown": "Shut down Proxmox guest"
+  },
+  "permissions": {
+    "use": {
+      "title": "View guests",
+      "description": "View saved guests and their status."
+    },
+    "manage": {
+      "title": "Control guests",
+      "description": "Configure and start guests or cancel their automatic shutdown."
+    }
+  },
+  "settings": {
+    "host": {
+      "enabled": {
+        "label": "Enable Proxmox Power",
+        "description": "Allow this host to be selected as a Proxmox control host."
+      }
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "id": "pve-power",
+  "name": "Proxmox Power",
+  "version": "0.6.6",
+  "description": "Start Proxmox VMs and LXC containers on demand and shut them down after idle CPU use or a time limit.",
+  "author": {
+    "name": "jeakob",
+    "url": "https://github.com/jeakob"
+  },
+  "license": "MIT",
+  "category": "Infrastructure",
+  "icon": "Power",
+  "features": [
+    "Start or gracefully stop a Proxmox VM or LXC container",
+    "Start a linked guest from its host action before connecting",
+    "Graceful shutdown after sustained idle CPU use or maximum uptime"
+  ],
+  "engine": {
+    "termix": ">=26.10.0",
+    "api": "^1.2"
+  },
+  "capabilities": [
+    "files:own",
+    "network:serve",
+    "hosts:read",
+    "ssh:connect",
+    "credentials:use",
+    "users:impersonate",
+    "ui:surface"
+  ],
+  "contributes": {
+    "tabs": [
+      {
+        "id": "pve-power",
+        "titleKey": "tab.title",
+        "icon": "Power",
+        "openFrom": [
+          "rail"
+        ]
+      },
+      {
+        "id": "pve-power-connect",
+        "titleKey": "hostAction.title",
+        "icon": "PlugZap",
+        "openFrom": [
+          "host-context-menu"
+        ]
+      }
+    ],
+    "permissions": [
+      {
+        "name": "use",
+        "titleKey": "permissions.use.title",
+        "descriptionKey": "permissions.use.description",
+        "defaultRoles": [
+          "admin"
+        ]
+      },
+      {
+        "name": "manage",
+        "titleKey": "permissions.manage.title",
+        "descriptionKey": "permissions.manage.description",
+        "defaultRoles": [
+          "admin"
+        ]
+      }
+    ],
+    "settings": {
+      "host": {
+        "enableKey": "enabled",
+        "enableLabelKey": "settings.host.enabled.label",
+        "fields": []
+      }
+    }
+  },
+  "locales": "locales",
+  "repository": "https://github.com/jeakob/termix-plugin-pve-power",
+  "docs": "https://github.com/jeakob/termix-plugin-pve-power/blob/main/docs/index.md"
+}

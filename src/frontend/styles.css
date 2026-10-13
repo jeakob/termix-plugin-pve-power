@@ -1,0 +1,44 @@
+.pve-page {
+  box-sizing: border-box;
+  max-width: 1360px;
+  margin-inline: auto;
+  padding: 24px;
+  display: grid;
+  gap: 24px;
+}
+.pve-page * { box-sizing: border-box; }
+.pve-intro { max-width: 780px; margin: 0; color: var(--muted-foreground); line-height: 1.55; }
+.pve-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 24px; }
+.pve-panel, .pve-guest-card { min-width: 0; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 12px; padding: 24px; }
+.pve-section-head { margin-bottom: 20px; }
+.pve-section-head h2, .pve-list-head h2 { margin: 0; font-size: 1.2em; font-weight: 700; }
+.pve-section-head p { margin: 4px 0 0; color: var(--muted-foreground); font-size: .9em; }
+.pve-form, .pve-guest-list { display: grid; gap: 16px; }
+.pve-field { min-width: 0; display: grid; gap: 7px; font-size: .9em; font-weight: 600; }
+.pve-field small { color: var(--muted-foreground); font-size: .82em; font-weight: 400; }
+.pve-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.pve-control { width: 100%; min-width: 0; min-height: 42px; padding: 9px 12px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 8px; color: inherit; font: inherit; }
+.pve-control:focus-visible, .pve-button:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-offset: 2px; }
+.pve-control:disabled, .pve-button:disabled { opacity: .5; cursor: not-allowed; }
+.pve-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 18px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); }
+.pve-button { min-height: 40px; padding: 8px 14px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: .9em; font-weight: 600; cursor: pointer; }
+.pve-button:hover:not(:disabled) { background: var(--accent); }
+.pve-button-primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+.pve-button-primary:hover:not(:disabled) { filter: brightness(1.07); background: var(--primary); }
+.pve-list-head, .pve-guest-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.pve-list-head { align-items: baseline; }
+.pve-list-head span, .pve-guest-head p, .pve-empty { color: var(--muted-foreground); font-size: .9em; }
+.pve-guest-head h3 { margin: 0; font-size: 1.15em; font-weight: 700; }
+.pve-guest-head p { margin: 2px 0 0; }
+.pve-status { flex: none; padding: 4px 9px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 7px; color: var(--muted-foreground); font-size: .78em; font-weight: 600; }
+.pve-status-running { color: #22c55e; }
+.pve-status-stopping { color: #f59e0b; }
+.pve-metrics { display: flex; flex-wrap: wrap; column-gap: 24px; row-gap: 6px; margin-top: 20px; font-size: .9em; }
+.pve-countdown { display: grid; gap: 3px; margin-top: 18px; padding: 15px 17px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 9px; background: rgba(127,127,127,.08); }
+.pve-countdown > span { color: var(--muted-foreground); font-size: .82em; }
+.pve-countdown strong { font-size: 1.7em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.pve-countdown small { color: var(--muted-foreground); font-size: .78em; }
+.pve-idle-progress { margin: 12px 0 0; color: var(--muted-foreground); font-size: .85em; }
+.pve-guest-actions { margin-top: 20px; }
+@media (max-width: 900px) { .pve-layout { grid-template-columns: 1fr; } }
+@media (max-width: 580px) { .pve-page { padding: 16px; } .pve-panel, .pve-guest-card { padding: 18px; } .pve-field-grid { grid-template-columns: 1fr; } }

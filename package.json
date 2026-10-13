@@ -1,0 +1,17 @@
+{
+  "name": "termix-plugin-pve-power",
+  "version": "0.6.6",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "termix-plugin build",
+    "test": "termix-plugin test",
+    "validate": "termix-plugin validate",
+    "pack": "termix-plugin pack",
+    "typecheck": "node --check src/backend/index.js && node --check src/backend/policy.js && node --check src/frontend/index.js"
+  },
+  "devDependencies": {
+    "@termix-ssh/plugin-sdk": "^1.0.6",
+    "vitest": "^4.1.11"
+  }
+}
