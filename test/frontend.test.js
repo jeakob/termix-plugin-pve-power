@@ -15,16 +15,18 @@ test("every frontend locale key exists in en.json", () => {
   const source = readFileSync(new URL("../src/frontend/index.js", import.meta.url), "utf8");
   const keys = [...source.matchAll(/(?:\bt|titleKey:)\(?\s*"([a-zA-Z.]+)"/g)].map(match => match[1]);
   // Keys picked at runtime: `status.${...}` and the guest type labels.
-  keys.push("status.checking", "status.starting", "status.running", "status.stopped", "status.stopping");
+  keys.push("status.checking", "status.starting", "status.running", "status.stopped", "status.stopping", "status.restarting");
   assert.ok(keys.length > 40);
   for (const key of keys) assert.equal(typeof (lookup(key) ?? lookup(`${key}_one`)), "string", `missing locale key ${key}`);
 });
 
-test("host click fetches the current guest link before opening SSH", async () => {
+test("host actions and mobile controls use the saved guest link", async () => {
   const calls = [];
   const actions = {};
+  const slots = {};
   const toasts = [];
   let wakeTab;
+  let controlsTab;
   let effects = [];
   let hookState = [];
   let hookIndex = 0;
@@ -43,7 +45,7 @@ test("host click fetches the current guest link before opening SSH", async () =>
       return { data: path === "/ssh-ready" ? { ready: true } : { guests: [{ key: "62:lxc:pve:104", last: { status: "starting" } }] } };
     },
   };
-  const React = { createElement() {}, useEffect(fn) { effects.push(fn); }, useState(initial) {
+  const React = { createElement(type, props, ...children) { return { type, props, children }; }, useEffect(fn) { effects.push(fn); }, useState(initial) {
     const index = hookIndex++;
     if (!(index in hookState)) hookState[index] = initial;
     return [hookState[index], value => {
@@ -55,27 +57,42 @@ test("host click fetches the current guest link before opening SSH", async () =>
     .replace('import "./styles.css";\n', "")
     .replace('import React, { useEffect, useState } from "react";', 'const React = globalThis.__pveMocks.React; const { useEffect, useState } = React;')
     .replace('import { usePermission, usePluginApi, useTranslation } from "@termix-ssh/plugin-sdk/frontend";', 'const { usePermission, usePluginApi, useTranslation } = globalThis.__pveMocks.frontend;')
-    .replace('import { PanelShell } from "@termix-ssh/plugin-sdk/ui";', 'const { PanelShell } = globalThis.__pveMocks.ui;')
+    .replace('import { ListBadge, PanelShell } from "@termix-ssh/plugin-sdk/ui";', 'const { ListBadge, PanelShell } = globalThis.__pveMocks.ui;')
     .replace('import { toast } from "sonner";', 'const { toast } = globalThis.__pveMocks.sonner;');
   globalThis.__pveMocks = {
     React,
-    frontend: { usePermission() {}, usePluginApi() { return api; }, useTranslation() { return { t }; } },
-    ui: { PanelShell() {} },
-    sonner: { toast: { success(text) { toasts.push(text); }, error(text) { toasts.push(`error: ${text}`); } } },
+    frontend: { usePermission() { return true; }, usePluginApi() { return api; }, useTranslation() { return { t }; } },
+    ui: { ListBadge() {}, PanelShell() {} },
+    sonner: { toast: { success(text) { toasts.push(text); }, info(text) { toasts.push(text); }, error(text) { toasts.push(`error: ${text}`); } } },
   };
   globalThis.confirm = () => true;
   const module = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
   delete globalThis.__pveMocks;
   await module.activate({
     hasPermission: async () => false,
-    registerRailItem() {}, registerTab(type, component) { if (type.endsWith("-connect")) wakeTab = component; }, registerHostAction(value) { actions[value.id] = value; },
+    registerRailItem() {}, registerTab(type, component) { if (type.endsWith("-connect")) wakeTab = component; if (type === "Proxmox-Power-Controls") controlsTab = component; }, registerHostAction(value) { actions[value.id] = value; },
+    registerSlotContribution(id, value) { slots[id] = value; },
     api, t,
   });
   const action = actions["pve-power.connect"];
   assert.equal(action.when({ id: 74, enableSsh: true }), true);
   assert.equal(action.when({ id: 62, enableSsh: true }), false);
-  assert.equal(action.tabType, "pve-power-connect");
-  assert.equal(action.run, undefined);
+  assert.equal(t(actions["pve-power.controls"].titleKey), "PVE Power");
+  assert.equal(actions["pve-power.controls"].tabType, "Proxmox-Power-Controls");
+  assert.equal(actions["pve-power.controls"].when({ id: 74 }), true);
+  assert.equal(t(action.titleKey), "Start PVE + SSH");
+  assert.equal(t(actions["pve-power.start"].titleKey), "Start PVE");
+  assert.equal(t(actions["pve-power.shutdown"].titleKey), "Stop PVE");
+  const tile = slots["host-page.tiles"];
+  assert.equal(tile.actionId, "pve-power.controls");
+  assert.equal(tile.when({ host: { id: 74 } }), true);
+  assert.equal(tile.when({ host: { id: 62 } }), false);
+  const tileView = tile.component({ host: { id: 74 }, isVisible: true });
+  assert.equal(tileView.type, controlsTab);
+  assert.equal(tileView.props.tile, true);
+  assert.equal(action.tabType, undefined);
+  action.run({ id: 74 }, { openTab(_host, type) { calls.push(type); } });
+  assert.equal(calls.pop(), "pve-power-connect");
   let wakeEffects = renderWake({ tab: { id: "wake-74" }, host: { id: 74, enableSsh: true }, isFocusedPane: true, shell: {
     openTab(_host, type) { calls.push(type); },
     closeTab(id) { calls.push(id); },
@@ -130,4 +147,48 @@ test("host click fetches the current guest link before opening SSH", async () =>
   assert.equal(calls.at(-1)[0], "/stop");
   assert.equal(calls.at(-1)[1].key, "62:lxc:pve:104");
   assert.equal(toasts.at(-1), "Graceful shutdown requested for CT 104");
+
+  const manifest = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
+  assert.ok(manifest.contributes.mobile.views.includes("Proxmox-Power-Controls"));
+  assert.ok(manifest.contributes.tabs.some(tab => tab.id === "Proxmox-Power-Controls" && tab.openFrom.includes("host-context-menu")));
+  api.get = async path => {
+    calls.push([path]);
+    return { data: { guests: [{ key: "62:lxc:pve:104", config: { hostId: 62, type: "lxc", vmid: 104, connectionHostId: 74 }, last: { status: "running" } }] } };
+  };
+  api.post = async (path, body) => {
+    calls.push([path, body]);
+    return { data: { guests: [{ key: "62:lxc:pve:104", config: { hostId: 62, type: "lxc", vmid: 104, connectionHostId: 74 }, last: { status: path === "/refresh" ? "stopped" : path === "/start" ? "running" : path === "/restart" ? "restarting" : "stopping" } }] } };
+  };
+  hookState = [];
+  const editor = { editHost(id) { calls.push(["editHost", id]); }, openHostEditor() { calls.push(["openHostEditor"]); } };
+  const renderControls = () => { hookIndex = 0; effects = []; return controlsTab({ host: { id: 74, name: "Postiz" }, shell: editor }); };
+  const buttons = node => node && typeof node === "object" ? [node.type === "button" ? node : null, ...node.children.flatMap(buttons)].filter(Boolean) : [];
+  const button = label => buttons(renderControls()).find(item => item.children.includes(label));
+  renderControls();
+  effects[0]();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls.at(-2), ["/vm"]);
+  assert.deepEqual(calls.at(-1), ["/refresh", { key: "62:lxc:pve:104" }]);
+  assert.ok(button("Edit host"));
+  button("Edit host").props.onClick();
+  assert.deepEqual(calls.at(-1), ["editHost", 74]);
+  editor.editHost = undefined;
+  button("Edit host").props.onClick();
+  assert.deepEqual(calls.at(-1), ["openHostEditor"]);
+  assert.equal(toasts.at(-1), "Select Postiz in Hosts to edit it.");
+  await button("Start").props.onClick();
+  assert.equal(calls.at(-1)[0], "/start");
+  assert.equal(calls.at(-1)[1].connectionHostId, 74);
+  await button("Stop").props.onClick();
+  assert.equal(calls.at(-1)[0], "/stop");
+  assert.equal(calls.at(-1)[1].key, "62:lxc:pve:104");
+  hookState[0].last.status = "running";
+  await button("Restart").props.onClick();
+  assert.equal(calls.at(-1)[0], "/restart");
+  assert.equal(calls.at(-1)[1].key, "62:lxc:pve:104");
+  assert.equal(toasts.at(-1), "Restart requested for CT 104");
+  hookIndex = 0;
+  const tiled = controlsTab({ host: { id: 74, name: "Postiz" }, tile: true });
+  assert.equal(tiled.type, "section");
+  assert.equal(buttons(tiled).some(item => item.children.includes("Edit host")), false);
 });

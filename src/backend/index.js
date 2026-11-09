@@ -1,6 +1,6 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { evaluate, validateConfig } from "./policy.js";
+import { evaluate, hasShutdownRule, validateConfig } from "./policy.js";
 
 function run(client, command) {
   return new Promise((resolve, reject) => {
@@ -196,7 +196,7 @@ export async function activate(ctx) {
    * @openapi
    * /plugin-api/pve-power/refresh:
    *   post:
-   *     summary: Check the status of every guest that is not being monitored
+   *     summary: Check one guest by key, or every guest that is not being monitored
    *     description: Needs the Proxmox Power manage permission.
    *     tags:
    *       - Proxmox Power
@@ -210,12 +210,16 @@ export async function activate(ctx) {
    *       409:
    *         description: Another guest check is in progress or the guest is in the wrong state
    */
-  router.post("/refresh", ctx.rbac.require("manage"), async (_req, res) => {
+  router.post("/refresh", ctx.rbac.require("manage"), async (req, res) => {
+    const key = req.body?.key;
+    if (key !== undefined && (typeof key !== "string" || !state.guests.some(guest => guest.key === key))) {
+      return res.status(400).json({ error: "Invalid guest key" });
+    }
     if (busy) return res.status(409).json({ error: "Guest check in progress" });
     busy = true;
     try {
       for (const guest of state.guests) {
-        if (guest.armed) continue;
+        if (guest.armed || (key && guest.key !== key)) continue;
         try {
           await checkHost(guest.config);
           const current = await status(ctx, guest.config);
@@ -387,7 +391,7 @@ export async function activate(ctx) {
       }
       if (existing?.armed) return res.status(409).json({ error: "Guest is already being monitored" });
       const previous = state.guests;
-      const guest = { key, config, armed: { userId: ctx.currentActor(), requestedAt: Date.now(), bootEpoch: null, idleSamples: 0 }, last: { status: "starting", checkedAt: Date.now(), error: null } };
+      const guest = { key, config, armed: hasShutdownRule(config) ? { userId: ctx.currentActor(), requestedAt: Date.now(), bootEpoch: null, idleSamples: 0 } : null, last: { status: "starting", checkedAt: Date.now(), error: null } };
       state.guests = [...state.guests.filter(item => item.key !== key), guest];
       try { await save(); } catch (error) { state.guests = previous; throw error; }
       try { await pvesh(ctx, config, `/nodes/${config.node}/${config.type}/${config.vmid}/status/start`, "create"); }
@@ -472,6 +476,7 @@ export async function activate(ctx) {
     const guest = state.guests.find(item => item.key === req.body?.key);
     if (!guest) return res.status(404).json({ error: "Guest not found" });
     if (guest.armed) return res.status(409).json({ error: "Guest is already being monitored" });
+    if (!hasShutdownRule(guest.config)) return res.status(409).json({ error: "Set an idle CPU threshold or maximum uptime first" });
     busy = true;
     try {
       await checkHost(guest.config);
@@ -533,6 +538,51 @@ export async function activate(ctx) {
       ctx.log.info(`Requested graceful shutdown of ${type} ${vmid} manually`);
       res.json(view());
     } catch (error) { res.status(502).json({ error: `Could not stop guest: ${error.message}` }); }
+    finally { busy = false; }
+  });
+  /**
+   * @openapi
+   * /plugin-api/pve-power/restart:
+   *   post:
+   *     summary: Gracefully reboot a running guest
+   *     description: Needs the Proxmox Power manage permission. Existing shutdown rules stay armed.
+   *     tags:
+   *       - Proxmox Power
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/PvePowerKey'
+   *     responses:
+   *       200:
+   *         description: The saved guests
+   *       404:
+   *         description: Guest not found
+   *       409:
+   *         description: Guest is not running or another check is in progress
+   *       502:
+   *         description: Proxmox could not reboot the guest
+   */
+  router.post("/restart", ctx.rbac.require("manage"), async (req, res) => {
+    if (busy) return res.status(409).json({ error: "Guest check in progress" });
+    const guest = state.guests.find(item => item.key === req.body?.key);
+    if (!guest) return res.status(404).json({ error: "Guest not found" });
+    if (guest.armed?.shutdownRequestedAt || guest.last?.stopRequestedAt) return res.status(409).json({ error: "Graceful shutdown was already requested" });
+    busy = true;
+    try {
+      await checkHost(guest.config);
+      const current = await status(ctx, guest.config);
+      if (current.status !== "running") return res.status(409).json({ error: "Guest is not running" });
+      const { node, type, vmid } = guest.config;
+      await pvesh(ctx, guest.config, `/nodes/${node}/${type}/${vmid}/status/reboot`, "create");
+      const requestedAt = Date.now();
+      if (guest.armed) Object.assign(guest.armed, { requestedAt, bootEpoch: null, idleSamples: 0, restartPendingUntil: requestedAt + 120_000 });
+      guest.last = { status: "restarting", checkedAt: requestedAt, error: null };
+      await save();
+      ctx.log.info(`Requested reboot of ${type} ${vmid}`);
+      res.json(view());
+    } catch (error) { res.status(502).json({ error: `Could not restart guest: ${error.message}` }); }
     finally { busy = false; }
   });
   /**

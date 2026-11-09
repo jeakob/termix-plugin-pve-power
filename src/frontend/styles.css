@@ -40,5 +40,25 @@
 .pve-countdown small { color: var(--muted-foreground); font-size: .78em; }
 .pve-idle-progress { margin: 12px 0 0; color: var(--muted-foreground); font-size: .85em; }
 .pve-guest-actions { margin-top: 20px; }
+.pve-host-page { box-sizing: border-box; width: 100%; max-width: 760px; margin-inline: auto; padding: 24px; display: grid; gap: 24px; }
+.pve-host-page * { box-sizing: border-box; }
+.pve-host-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.pve-host-heading h2 { margin: 3px 0; font-size: 1.5rem; line-height: 1.2; font-weight: 700; }
+.pve-host-eyebrow { margin: 0; color: var(--muted-foreground); font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.pve-host-muted { margin: 0; color: var(--muted-foreground); font-size: .85rem; }
+.pve-host-details { border-top: 1px solid var(--border); }
+.pve-host-details > div { display: flex; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.pve-host-details span { color: var(--muted-foreground); }
+.pve-host-details strong { text-align: right; font-weight: 600; }
+.pve-host-actions { display: grid; gap: 12px; }
+.pve-host-actions .pve-button { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; min-height: 48px; }
+.pve-host-edit { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+.pve-host-tile-frame { height: 100%; min-height: 0; overflow: auto; border: 1px solid var(--border); }
+.pve-host-tile-title { margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: .85rem; font-weight: 600; }
+.pve-host-tile { max-width: none; margin: 0; padding: 12px; gap: 10px; }
+.pve-host-tile .pve-host-heading h2 { font-size: 1.1rem; }
+.pve-host-tile .pve-host-details > div { padding: 6px 0; }
+.pve-host-tile .pve-host-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pve-host-tile .pve-host-actions .pve-button { flex: 1; width: auto; min-height: 36px; }
 @media (max-width: 900px) { .pve-layout { grid-template-columns: 1fr; } }
-@media (max-width: 580px) { .pve-page { padding: 16px; } .pve-panel, .pve-guest-card { padding: 18px; } .pve-field-grid { grid-template-columns: 1fr; } }
+@media (max-width: 580px) { .pve-page, .pve-host-page { padding: 16px; } .pve-panel, .pve-guest-card { padding: 18px; } .pve-field-grid { grid-template-columns: 1fr; } }

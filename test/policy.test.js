@@ -30,6 +30,12 @@ test("external restart disarms; missing CPU never triggers idle shutdown", () =>
   assert.equal(evaluate({ status: "running", uptime: 900 }, { ...armed, idleSamples: 4 }, config, now).idleSamples, 0);
 });
 
+test("a requested reboot does not trigger shutdown while Proxmox restarts the guest", () => {
+  const restarting = { ...armed, requestedAt: now, bootEpoch: null, restartPendingUntil: now + 120_000 };
+  assert.equal(evaluate({ status: "running", uptime: 7200, cpu: 0.01 }, restarting, config, now + 60_000).action, "continue");
+  assert.equal(evaluate({ status: "running", uptime: 60, cpu: 0.5 }, restarting, config, now + 120_000).action, "continue");
+});
+
 test("start and shutdown requests remain pending until Proxmox confirms a stop", () => {
   assert.equal(evaluate({ status: "stopped" }, { ...armed, requestedAt: now - 60_000 }, config, now).action, "continue");
   assert.equal(evaluate({ status: "running", uptime: 900, cpu: 0.01 }, { ...armed, shutdownRequestedAt: now - 60_000, idleSamples: 4 }, config, now).action, "continue");

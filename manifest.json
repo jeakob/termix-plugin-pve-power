@@ -1,7 +1,7 @@
 {
   "id": "pve-power",
   "name": "Proxmox Power",
-  "version": "0.6.9",
+  "version": "0.7.0",
   "description": "Start Proxmox VMs and LXC containers on demand and shut them down after idle CPU use or a time limit.",
   "author": {
     "name": "jeakob",
@@ -16,8 +16,8 @@
     "Graceful shutdown after sustained idle CPU use or maximum uptime"
   ],
   "engine": {
-    "termix": ">=26.10.0",
-    "api": "^1.2"
+    "termix": ">=26.10.6",
+    "api": "^1.13"
   },
   "capabilities": [
     "files:own",
@@ -29,6 +29,10 @@
     "ui:surface"
   ],
   "contributes": {
+    "mobile": {
+      "mode": "webview",
+      "views": ["pve-power", "Proxmox-Power-Controls"]
+    },
     "tabs": [
       {
         "id": "pve-power",
@@ -42,6 +46,14 @@
         "id": "pve-power-connect",
         "titleKey": "hostAction.title",
         "icon": "PlugZap",
+        "openFrom": [
+          "host-context-menu"
+        ]
+      },
+      {
+        "id": "Proxmox-Power-Controls",
+        "titleKey": "hostAction.controls",
+        "icon": "Power",
         "openFrom": [
           "host-context-menu"
         ]

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.0
+
+### Added
+
+- Manage a linked guest from its SSH host page. The **PVE Power** sidebar action opens a focused view with guest status and Start, Stop, Restart, and Edit host controls. On Termix 26.11.1 or newer, the host overview can also show these controls in a movable tile.
+- Open Proxmox Power on phones and tablets with Termix Mobile 2.0. Linked hosts also have a controls view in the mobile host menu.
+
+### Changed
+
+- Show the last known guest state as soon as the host controls open, then refresh that guest from Proxmox.
+- Shorten the linked host actions to **PVE Power**, **Start PVE + SSH**, **Start PVE**, and **Stop PVE** so they fit in the sidebar.
+- Open **Start PVE + SSH** in a temporary tab and hand off to the terminal when the guest is ready, leaving the host page free of the waiting screen.
+
+### Fixed
+
+- Keep the host overview tile compatible with Termix Mobile 2.0.
+- Leave automatic shutdown off when both the idle CPU threshold and maximum uptime are set to zero.
+
 ## 0.6.9
 
 ### Fixed

@@ -4,14 +4,14 @@ Save and start multiple QEMU VMs or LXC containers from Termix. Each started gue
 
 ![Proxmox Power tab with a saved stopped guest and a running guest counting down to automatic shutdown](docs/img/screenshot.png)
 
-Linked hosts get three actions in the host list: **Start Proxmox guest and connect**, **Start Proxmox guest** and **Shut down Proxmox guest**.
+Linked hosts get **PVE Power**, **Start PVE + SSH**, **Start PVE** and **Stop PVE** actions.
 
 ![Host row with the plugin's connect, start and shut down icons next to the terminal icon](docs/img/host-row.png)
 
 ## What it does
 
 - Starts and gracefully shuts down linked Proxmox VMs and LXC containers from Termix.
-- Starts a stopped guest when you choose **Start Proxmox guest and connect**, then opens its SSH terminal when it is ready.
+- Starts a stopped guest when you choose **Start PVE + SSH**, then opens its SSH terminal when it is ready.
 - Monitors guests you start or explicitly choose to monitor, and requests shutdown after sustained low CPU usage or the configured maximum uptime.
 - Shows guest status, CPU use, uptime, and the shutdown countdown in Termix.
 - Provides authenticated API endpoints so automation services can start or stop saved guests.
@@ -24,11 +24,15 @@ Linked hosts get three actions in the host list: **Start Proxmox guest and conne
 
 ## Install
 
-1. Use Termix **v26.10.0 or newer** and enable Plugin developer mode in Settings → General.
+1. Use Termix **v26.10.6 or newer** and enable Plugin developer mode in Settings → General.
 2. Download the latest `pve-power-*.tmxplug` file from [Releases](https://github.com/jeakob/termix-plugin-pve-power/releases/latest).
 3. In Termix, open **Plugins → Install from file** and select the downloaded file. Grant the capabilities listed below when prompted.
 4. Add the Proxmox node as a normal SSH host in Termix. In the host editor, enable **Proxmox Power**. Its SSH account must be permitted to run `pvesh` for this guest.
 5. Open the **Proxmox Power** tab, select a Termix Proxmox host and a QEMU VM or LXC container by name, then press **Save guest** or **Start selected guest**. To start a guest when you open its Termix SSH host, also select **Termix connection host** before saving. Saved guests show their current status when the tab opens and refresh once a minute. A running guest can be added to automatic shutdown with **Monitor guest**, or shut down immediately with **Stop guest**.
+
+On Termix Mobile 2.0.0 or newer, the Proxmox Power tab opens from the linked server as a web view on phones and tablets. Open **Proxmox Power Controls** from a linked SSH host's menu to start or stop its guest. The **Start PVE + SSH** action remains available in the web and desktop apps.
+
+On Termix 26.11.1 or newer with Operations Center enabled, the host page shows **PVE Power** in the sidebar and a Proxmox Power Controls tile for each linked guest on Overview. The controls show the guest state, automatic shutdown state, uptime, and Start, Stop, or Restart buttons. You can move or resize the tile with the host page's layout editor. **Start PVE + SSH** opens a temporary tab and hands off to the terminal.
 
 ### Capabilities
 
@@ -45,7 +49,7 @@ The plugin uses the Termix SSH connection for each host, so its jump host and au
 
 The maximum uptime is the guest's total uptime reported by Proxmox. Monitored guests show a live countdown to that limit and the number of consecutive low CPU checks. The countdown is based on the most recent Proxmox sample and is corrected on each check. If you monitor an already running guest whose uptime exceeds the configured limit, the next check can request shutdown immediately.
 
-Clicking a linked SSH host opens Termix’s default SSH terminal. The **Start Proxmox guest and connect** action remains available in the host menu; choosing it starts a linked Proxmox guest if it is stopped, then opens the SSH terminal. A guest already running is left running and connected normally. Linked hosts also get **Start Proxmox guest**, which starts the guest without opening a terminal, and a **Shut down Proxmox guest** action, which requests a graceful shutdown after confirmation. The separate Terminal action and reconnecting an existing tab bypass host actions in Termix. After starting a stopped guest, the plugin waits up to about two minutes for its SSH host to accept a connection before opening the terminal.
+Clicking a linked SSH host opens Termix’s default SSH terminal. The **Start PVE + SSH** action remains available in the host menu; choosing it starts a linked Proxmox guest if it is stopped, then opens the SSH terminal. A guest already running is left running and connected normally. Linked hosts also get **Start PVE**, which starts the guest without opening a terminal, and a **Stop PVE** action, which requests a graceful guest shutdown after confirmation. The **Proxmox Power Controls** host view has Start, Stop, Restart, and Edit host actions. On mobile, Edit host opens Hosts so you can select the host to edit. The separate Terminal action and reconnecting an existing tab bypass host actions in Termix. After starting a stopped guest, the plugin waits up to about two minutes for its SSH host to accept a connection before opening the terminal.
 
 The CPU value is Proxmox's guest CPU usage percentage. Low CPU alone does not prove that a guest is safe to stop. Choose a threshold and uptime limit that suit the workload, and enable the QEMU guest agent where appropriate for reliable VM shutdown.
 

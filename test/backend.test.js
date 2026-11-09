@@ -12,7 +12,7 @@ test("multiple guests keep separate start and shutdown state, including migrated
   const dir = await mkdtemp(join(tmpdir(), "termix-guests-"));
   const routes = new Map();
   const commands = [];
-  const statuses = { "qemu/101": "stopped", "lxc/202": "stopped" };
+  const statuses = { "qemu/101": "stopped", "lxc/202": "stopped", "qemu/303": "stopped" };
   const impersonated = [];
   let tick;
   const client = {
@@ -26,11 +26,11 @@ test("multiple guests keep separate start and shutdown state, including migrated
         if (command.includes("cluster/resources")) {
           stream.emit("data", JSON.stringify([{ type: "qemu", vmid: 101, node: "pve", name: "Build VM" }, { type: "lxc", vmid: 202, node: "pve", name: "Container" }]));
         } else {
-          const match = command.match(/\/nodes\/pve\/(qemu|lxc)\/(\d+)\/status\/(current|start|shutdown)/);
+          const match = command.match(/\/nodes\/pve\/(qemu|lxc)\/(\d+)\/status\/(current|start|shutdown|reboot)/);
           assert.ok(match, command);
           const key = `${match[1]}/${match[2]}`;
           if (match[3] === "current") stream.emit("data", JSON.stringify({ status: statuses[key], uptime: statuses[key] === "running" ? 7200 : 0, cpu: 0.7 }));
-          else statuses[key] = match[3] === "start" ? "running" : "stopped";
+          else if (match[3] !== "reboot") statuses[key] = match[3] === "start" ? "running" : "stopped";
         }
         stream.emit("close", 0);
       });
@@ -79,6 +79,10 @@ test("multiple guests keep separate start and shutdown state, including migrated
     assert.equal(again.code, 200);
     assert.equal(again.output.guests.find(guest => guest.key === "1:lxc:pve:202").last.status, "running");
     assert.equal((await call("POST", "/start", lxc)).code, 409);
+    const noRule = { ...qemu, vmid: 303, idleCpuPercent: 0, maxUptimeMinutes: 0 };
+    assert.equal((await call("POST", "/start", noRule)).output.guests.find(guest => guest.key === "1:qemu:pve:303").armed, null);
+    assert.equal((await call("POST", "/adopt", { key: "1:qemu:pve:303" })).code, 409);
+    assert.equal((await call("POST", "/remove", { key: "1:qemu:pve:303" })).code, 200);
     await tick();
     assert.deepEqual(impersonated, ["admin", "admin"]);
     assert.ok(commands.some(command => command.includes("/qemu/101/status/shutdown")));
@@ -115,6 +119,10 @@ test("multiple guests keep separate start and shutdown state, including migrated
     statuses["qemu/101"] = "running";
     const mapped = { ...qemu, connectionHostId: 74 };
     assert.equal((await call("POST", "/config", mapped)).output.guests.find(guest => guest.key === "1:qemu:pve:101").config.connectionHostId, 74);
+    const beforeTargetedRefresh = commands.length;
+    assert.equal((await call("POST", "/refresh", { key: "1:qemu:pve:101" })).output.guests.find(guest => guest.key === "1:qemu:pve:101").last.status, "running");
+    assert.equal(commands.length, beforeTargetedRefresh + 1);
+    assert.equal((await call("POST", "/refresh", { key: "missing" })).code, 400);
     assert.equal((await call("POST", "/start", { ...mapped, allowRunning: true })).code, 200);
     assert.deepEqual((await call("POST", "/ssh-ready", { key: "1:qemu:pve:101" })).output, { ready: true });
     assert.equal((await call("POST", "/ssh-ready", { key: "1:lxc:pve:202" })).code, 404);
@@ -133,6 +141,12 @@ test("multiple guests keep separate start and shutdown state, including migrated
     statuses["lxc/202"] = "running";
     await call("POST", "/refresh");
     assert.equal((await call("POST", "/adopt", { key: "1:lxc:pve:202" })).code, 200);
+    const restarted = await call("POST", "/restart", { key: "1:lxc:pve:202" });
+    assert.equal(restarted.code, 200);
+    assert.equal(restarted.output.guests.find(guest => guest.key === "1:lxc:pve:202").last.status, "restarting");
+    assert.ok(restarted.output.guests.find(guest => guest.key === "1:lxc:pve:202").armed);
+    assert.ok(commands.some(command => command.includes("/lxc/202/status/reboot")));
+    assert.equal((await call("POST", "/restart", { key: "missing" })).code, 404);
     const armedStop = await call("POST", "/stop", { key: "1:lxc:pve:202" });
     assert.equal(armedStop.code, 200);
     assert.ok(armedStop.output.guests.find(guest => guest.key === "1:lxc:pve:202").armed.shutdownRequestedAt);

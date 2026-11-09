@@ -58,7 +58,8 @@
     "starting": "starting",
     "running": "running",
     "stopped": "stopped",
-    "stopping": "Shutting down"
+    "stopping": "Shutting down",
+    "restarting": "Restarting"
   },
   "actions": {
     "start": "Start guest",
@@ -73,6 +74,7 @@
     "monitorLimit": "Monitor this running guest? Its current uptime is about {{minutes}} minutes. The {{limit}}-minute limit may request shutdown on the next check.",
     "stop": "Request a graceful shutdown for {{guest}}? Work in the guest may be interrupted.",
     "hostStop": "Request a graceful shutdown for {{guest}}? Open sessions to {{host}} will be closed.",
+    "hostRestart": "Restart {{guest}}? Open sessions will disconnect while it reboots.",
     "thisHost": "this host"
   },
   "wake": {
@@ -85,12 +87,25 @@
     "notLinked": "No Proxmox guest is linked to this host",
     "started": "Started {{guest}}",
     "alreadyRunning": "{{guest}} is already running",
-    "stopRequested": "Graceful shutdown requested for {{guest}}"
+    "stopRequested": "Graceful shutdown requested for {{guest}}",
+    "restartRequested": "Restart requested for {{guest}}"
   },
   "hostAction": {
-    "title": "Start Proxmox guest and connect",
-    "start": "Start Proxmox guest",
-    "shutdown": "Shut down Proxmox guest"
+    "title": "Start PVE + SSH",
+    "sidebar": "PVE Power",
+    "controls": "Proxmox Power Controls",
+    "guest": "Linked guest",
+    "guestStatus": "Guest status",
+    "autoShutdown": "Auto shutdown",
+    "uptime": "Uptime",
+    "updating": "Updating status from Proxmox…",
+    "startButton": "Start",
+    "stopButton": "Stop",
+    "restartButton": "Restart",
+    "editHost": "Edit host",
+    "selectHost": "Select {{host}} in Hosts to edit it.",
+    "start": "Start PVE",
+    "shutdown": "Stop PVE"
   },
   "permissions": {
     "use": {

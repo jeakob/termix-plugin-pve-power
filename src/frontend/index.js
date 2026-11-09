@@ -1,7 +1,7 @@
 import "./styles.css";
 import React, { useEffect, useState } from "react";
 import { usePermission, usePluginApi, useTranslation } from "@termix-ssh/plugin-sdk/frontend";
-import { PanelShell } from "@termix-ssh/plugin-sdk/ui";
+import { ListBadge, PanelShell } from "@termix-ssh/plugin-sdk/ui";
 import { toast } from "sonner";
 
 const h = React.createElement;
@@ -11,6 +11,8 @@ const icon = (...paths) => props => h("svg", { ...props, viewBox: "0 0 24 24", f
 const Power = icon("M12 2v10", "M18.36 6.64a9 9 0 1 1-12.72 0");
 const Stop = icon("M5 5h14v14H5z");
 const Play = icon("m5 3 14 9-14 9V3z");
+const Restart = icon("M20 11a8 8 0 1 0 1 4", "M20 4v7h-7");
+const Edit = icon("M12 20h9", "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z");
 const PlugZap = icon("M12 22v-5", "M9 8V2", "M15 8V2", "M18 8v4a6 6 0 0 1-12 0V8z", "m14 14-2 3h4l-2 3");
 const guestLabel = (t, { type, vmid }) => t(type === "lxc" ? "guest.lxc" : "guest.qemu", { vmid });
 
@@ -56,6 +58,108 @@ function WakeTab({ tab, host, shell, isFocusedPane }) {
     h("h2", null, t(error ? "wake.failed" : waiting ? "wake.waiting" : "wake.connecting")),
     error && h("p", { role: "alert" }, error),
     error && h("button", { type: "button", className: "pve-button border", onClick: () => { setError(""); setAttempt(attempt + 1); } }, t("wake.retry")));
+}
+
+const hasRule = config => Number(config.idleCpuPercent) > 0 || Number(config.maxUptimeMinutes) > 0;
+
+function HostPowerTab({ host, shell, tile = false, isVisible = true }) {
+  const { t } = useTranslation();
+  const api = usePluginApi();
+  const canManage = usePermission("manage");
+  const [guest, setGuest] = useState(undefined);
+  const [message, setMessage] = useState("");
+  const [working, setWorking] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => {
+    if (!host || !isVisible) return;
+    let active = true;
+    setGuest(undefined);
+    setMessage("");
+    api.get("/vm").then(async ({ data }) => {
+      const linked = data.guests?.find(item => item.config.connectionHostId === Number(host.id));
+      if (!active) return;
+      setGuest(linked || null);
+      if (!linked || !canManage) return;
+      setRefreshing(true);
+      try {
+        const { data: fresh } = await api.post("/refresh", { key: linked.key });
+        if (active) setGuest(fresh.guests?.find(item => item.key === linked.key) || linked);
+      } catch (error) {
+        if (active) setMessage(error.response?.data?.error || error.message);
+      } finally {
+        if (active) setRefreshing(false);
+      }
+    }).catch(error => { if (active) setMessage(error.response?.data?.error || error.message); });
+    return () => { active = false; };
+  }, [host?.id, canManage, isVisible]);
+  useEffect(() => {
+    if (!isVisible || guest?.last?.status !== "restarting") return;
+    let active = true;
+    const timer = setInterval(() => {
+      api.post("/refresh", { key: guest.key }).then(({ data }) => {
+        if (active) setGuest(data.guests?.find(item => item.key === guest.key) || guest);
+      }).catch(error => { if (active) setMessage(error.response?.data?.error || error.message); });
+    }, 10_000);
+    return () => { active = false; clearInterval(timer); };
+  }, [guest?.key, guest?.last?.status, isVisible]);
+
+  async function send(path, body) {
+    setWorking(true);
+    setMessage("");
+    try {
+      const { data } = await api.post(path, body);
+      const updated = data.guests?.find(item => item.key === guest.key);
+      if (updated) setGuest(updated);
+      toast.success(t(path === "/restart" ? "toast.restartRequested" : path === "/stop" ? "toast.stopRequested" : updated?.last?.status === "starting" ? "toast.started" : "toast.alreadyRunning", { guest: guestLabel(t, guest.config) }));
+    } catch (error) {
+      setMessage(error.response?.data?.error || error.message);
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const running = guest?.last?.status === "running";
+  const status = guest?.last?.status || "checking";
+  const content = h("div", { className: `pve-host-page${tile ? " pve-host-tile" : ""}` },
+      guest === undefined ? h("p", { className: "pve-host-muted", role: "status" }, t("status.checking")) : guest ? h(React.Fragment, null,
+        h("div", { className: "pve-host-heading" },
+          h("div", null,
+            h("p", { className: "pve-host-eyebrow" }, t("hostAction.guest")),
+            h("h2", null, host.name || guestLabel(t, guest.config)),
+            h("p", { className: "pve-host-muted" }, `${guestLabel(t, guest.config)} · ${guest.config.node}`)),
+          h(ListBadge, { tone: status === "running" ? "success" : status === "stopping" ? "warning" : "muted" }, t(`status.${status}`))),
+        h("div", { className: "pve-host-details" },
+          !tile && h("div", null, h("span", null, t("hostAction.guestStatus")), h("strong", { "aria-live": "polite" }, t(`status.${status}`))),
+          h("div", null, h("span", null, t("hostAction.autoShutdown")), h("strong", null, t(guest.armed ? "guests.armed" : "guests.off"))),
+          guest.last?.status === "running" && h("div", null, h("span", null, t("hostAction.uptime")), h("strong", null, t("guests.uptime", { minutes: Math.floor((guest.last.uptime || 0) / 60) })))),
+        refreshing && h("p", { className: "pve-host-muted", role: "status" }, t("hostAction.updating")),
+        guest.last?.error && h("p", { role: "alert" }, guest.last.error),
+        canManage && h("div", { className: "pve-host-actions" },
+          !running && status !== "restarting" && h("button", { type: "button", className: "pve-button pve-button-primary", disabled: working || refreshing || status === "stopping", onClick: () => send("/start", { ...guest.config, allowRunning: true }) }, h(Play, { className: "size-4" }), t("hostAction.startButton")),
+          running && h("button", { type: "button", className: "pve-button", disabled: working || refreshing, onClick: () => {
+            if (globalThis.confirm(t("confirm.hostStop", { guest: guestLabel(t, guest.config), host: host.name || t("confirm.thisHost") }))) send("/stop", { key: guest.key });
+          } }, h(Stop, { className: "size-4" }), t("hostAction.stopButton")),
+          running && h("button", { type: "button", className: "pve-button", disabled: working || refreshing, onClick: () => {
+            if (globalThis.confirm(t("confirm.hostRestart", { guest: guestLabel(t, guest.config) }))) send("/restart", { key: guest.key });
+          } }, h(Restart, { className: "size-4" }), t("hostAction.restartButton"))
+        ),
+        !tile && (shell?.editHost || shell?.openHostEditor) && h("button", { type: "button", className: "pve-button pve-host-edit", onClick: () => {
+          if (shell.editHost) shell.editHost(Number(host.id));
+          else {
+            toast.info(t("hostAction.selectHost", { host: host.name || guestLabel(t, guest.config) }));
+            shell.openHostEditor();
+          }
+        } }, h(Edit, { className: "size-4" }), t("hostAction.editHost"))
+      ) : h("p", { className: "pve-host-muted" }, t("toast.notLinked")),
+      message && h("p", { role: "alert" }, message)
+    );
+  return tile ? h("section", { className: "pve-host-tile-frame" },
+    h("h3", { className: "pve-host-tile-title" }, t("hostAction.controls")), content)
+    : h(PanelShell, { icon: h(Power, { className: "size-4" }), title: t("hostAction.controls") }, content);
+}
+
+function HostPowerTile(props) {
+  return h(HostPowerTab, { ...props, tile: true });
 }
 
 function VmTab() {
@@ -216,7 +320,7 @@ function VmTab() {
             ))),
             h("div", { className: "pve-actions" },
               h("button", { type: "submit", className: `${button} pve-button-primary bg-primary text-primary-foreground`, disabled: working || Boolean(selectedGuest?.armed) }, t("setup.save")),
-              h("button", { type: "button", className: button, disabled: working || Boolean(selectedGuest?.armed) || selectedGuest?.last?.status === "stopping" || !form.hostId || !form.vmid,
+              h("button", { type: "button", className: button, disabled: working || Boolean(selectedGuest?.armed) || selectedGuest?.last?.status === "stopping" || !form.hostId || !form.vmid || (selectedGuest?.last?.status === "running" && !hasRule(form)),
                 onClick: () => selectedGuest?.last?.status === "running" ? monitor(selectedGuest) : send("/start", configBody()) },
                 t(selectedGuest?.last?.status === "running" ? "setup.monitor" : "setup.start"))
             )
@@ -258,7 +362,7 @@ function VmTab() {
               stopping && h("p", { className: "mt-3 text-sm text-muted-foreground" }, t("guests.stopRequested")),
               h("p", { className: "mt-3 text-sm text-muted-foreground" }, t(guest.armed ? "guests.armed" : "guests.off")),
               canManage && h("div", { className: "pve-actions pve-guest-actions" },
-                !guest.armed && !stopping && h("button", { type: "button", className: button, disabled: working, onClick: () => running ? monitor(guest) : send("/start", guest.config) }, t(running ? "actions.monitor" : "actions.start")),
+                !guest.armed && !stopping && !(running && !hasRule(guest.config)) && h("button", { type: "button", className: button, disabled: working, onClick: () => running ? monitor(guest) : send("/start", guest.config) }, t(running ? "actions.monitor" : "actions.start")),
                 running && !stopping && h("button", { type: "button", className: button, disabled: working, onClick: () => stop(guest) }, t("actions.stop")),
                 h("button", { type: "button", className: button, disabled: working, onClick: () => setForm(Object.fromEntries(Object.entries(guest.config).map(([key, value]) => [key, value == null ? "" : String(value)]))) }, t("actions.edit")),
                 guest.armed && h("button", { type: "button", className: button, disabled: working, onClick: () => send("/disarm", { key: guest.key }) }, t("actions.disarm")),
@@ -277,6 +381,7 @@ export async function activate(app) {
   app.registerRailItem({ id: "pve-power", icon: Power, titleKey: "tab.title", kind: "tab", permission: "use" });
   app.registerTab("pve-power", VmTab, { icon: Power, titleKey: "tab.title", singleton: true, hostless: true });
   app.registerTab("pve-power-connect", WakeTab, { icon: PlugZap, titleKey: "hostAction.title", persistent: false, requiresHost: true });
+  app.registerTab("Proxmox-Power-Controls", HostPowerTab, { icon: Power, titleKey: "hostAction.controls", persistent: false, requiresHost: true });
 
   // Host action `when` must be synchronous, so keep a cached copy of the linked hosts.
   let links = new Map();
@@ -297,9 +402,18 @@ export async function activate(app) {
     if (Date.now() - fetchedAt > 30_000) loadLinks();
     return links.has(Number(host.id));
   };
+  app.registerSlotContribution("host-page.tiles", {
+    actionId: "pve-power.controls", titleKey: "hostAction.controls", icon: Power,
+    kind: "component", component: HostPowerTile,
+    when: context => Boolean(context.host) && linked(context.host),
+  });
+  app.registerHostAction({
+    id: "pve-power.controls", titleKey: "hostAction.sidebar", icon: Power,
+    kind: "open", order: 10, tabType: "Proxmox-Power-Controls", when: linked,
+  });
   app.registerHostAction({
     id: "pve-power.connect", titleKey: "hostAction.title", icon: PlugZap,
-    kind: "open", order: 11, tabType: "pve-power-connect",
+    kind: "open", order: 11, run: (host, shell) => shell.openTab(host, "pve-power-connect"),
     when: host => Boolean(host.enableSsh) && linked(host),
   });
   app.registerHostAction({

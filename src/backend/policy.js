@@ -2,6 +2,10 @@ export function evaluate(status, armed, config, now = Date.now()) {
   if (status?.status === "stopped" && !armed.shutdownRequestedAt && now - armed.requestedAt < 300_000) {
     return { action: "continue", bootEpoch: null, idleSamples: 0 };
   }
+  // shortcut: leave two minutes for Proxmox to complete reboot; poll its task if slower reboots become common.
+  if (armed.restartPendingUntil && now < armed.restartPendingUntil) {
+    return { action: "continue", bootEpoch: null, idleSamples: 0 };
+  }
   if (!status || status.status !== "running" || !Number.isFinite(status.uptime) || status.uptime < 0) {
     return { action: "disarm", reason: "Guest is no longer running" };
   }
@@ -43,3 +47,5 @@ export function validateConfig(input) {
   if (!Number.isInteger(maxUptimeMinutes) || maxUptimeMinutes < 0 || maxUptimeMinutes > 525600) throw new Error("Maximum uptime must be 0 to 525600 minutes");
   return { hostId, node, vmid, type, connectionHostId, idleCpuPercent, maxUptimeMinutes };
 }
+
+export const hasShutdownRule = config => config.idleCpuPercent > 0 || config.maxUptimeMinutes > 0;
