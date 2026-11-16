@@ -24,7 +24,7 @@ Linked hosts get **PVE Power**, **Start LXC/VM + SSH**, **Start LXC/VM** and **S
 
 ## Install
 
-1. Use Termix **v26.10.6 or newer** and enable Plugin developer mode in Settings → General.
+1. Use Termix **v26.11.2 or newer** and enable Plugin developer mode in Settings → General.
 2. Download the latest `pve-power-*.tmxplug` file from [Releases](https://github.com/jeakob/termix-plugin-pve-power/releases/latest).
 3. In Termix, open **Plugins → Install from file** and select the downloaded file. Grant the capabilities listed below when prompted.
 4. Add the Proxmox node as a normal SSH host in Termix. In the host editor, enable **Proxmox Power**. Its SSH account must be permitted to run `pvesh` for this guest.

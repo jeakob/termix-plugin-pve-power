@@ -677,5 +677,5 @@ export async function activate(ctx) {
     } finally { busy = false; }
   });
 
-  ctx.schedule.every(60_000, poll);
+  ctx.schedule.every(60_000, poll, { id: "poll" });
 }
