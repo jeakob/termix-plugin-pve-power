@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1
+
+### Changed
+
+- Moved to Termix plugin API 2. The plugin now needs Termix 26.11.2 or later, and its backend runs in its own sandboxed process.
+
 ## 0.8.0
 
 ### Changed
