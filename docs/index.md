@@ -24,7 +24,7 @@ Start Proxmox VMs and LXC containers from Termix, and shut them down gracefully 
 - **Stop guest** asks Proxmox for a graceful shutdown now.
 - **Cancel auto shutdown** leaves the guest running.
 
-A linked connection host gets **PVE Power**, **Start PVE + SSH**, **Start PVE** and **Stop PVE** actions. Clicking the host itself still opens a normal SSH terminal.
+A linked connection host gets **PVE Power**, **Start LXC/VM + SSH**, **Start LXC/VM** and **Stop LXC/VM** actions. The action names say LXC or VM to match the linked guest. Each user can hide any of the four actions under **Host actions** in the Proxmox Power tab. Clicking the host itself still opens a normal SSH terminal.
 
 ![Host row with the plugin's connect, start and shut down icons next to the terminal icon](img/host-row.png)
 

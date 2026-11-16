@@ -17,6 +17,7 @@
     "proxmoxHostHelp": "Only hosts with Proxmox Power enabled in their host editor are listed.",
     "selectHost": "Select a host",
     "hostOption": "{{name}} (ID {{id}})",
+    "connectionOption": "{{name}} · {{address}}",
     "guest": "VM or LXC container",
     "selectGuest": "Select a guest",
     "noGuests": "No guests found",
@@ -66,6 +67,7 @@
     "monitor": "Monitor guest",
     "stop": "Stop guest",
     "edit": "Edit",
+    "link": "Link to {{host}}",
     "disarm": "Cancel auto shutdown",
     "remove": "Remove"
   },
@@ -91,7 +93,6 @@
     "restartRequested": "Restart requested for {{guest}}"
   },
   "hostAction": {
-    "title": "Start PVE + SSH",
     "sidebar": "PVE Power",
     "controls": "Proxmox Power Controls",
     "guest": "Linked guest",
@@ -104,8 +105,13 @@
     "restartButton": "Restart",
     "editHost": "Edit host",
     "selectHost": "Select {{host}} in Hosts to edit it.",
-    "start": "Start PVE",
-    "shutdown": "Stop PVE"
+    "connectLxc": "Start LXC + SSH",
+    "connectVm": "Start VM + SSH",
+    "startLxc": "Start LXC",
+    "startVm": "Start VM",
+    "shutdownLxc": "Stop LXC",
+    "shutdownVm": "Stop VM",
+    "title": "Start guest + SSH"
   },
   "permissions": {
     "use": {
@@ -123,6 +129,28 @@
         "label": "Enable Proxmox Power",
         "description": "Allow this host to be selected as a Proxmox control host."
       }
+    },
+    "user": {
+      "showControls": {
+        "label": "Show PVE Power",
+        "description": "Show the PVE Power controls action on linked hosts."
+      },
+      "showConnect": {
+        "label": "Show Start + SSH",
+        "description": "Show the action that starts the linked guest and then opens SSH."
+      },
+      "showStart": {
+        "label": "Show Start",
+        "description": "Show the action that starts the linked guest."
+      },
+      "showStop": {
+        "label": "Show Stop",
+        "description": "Show the action that shuts down the linked guest."
+      }
     }
+  },
+  "actionsPanel": {
+    "title": "Host actions",
+    "description": "Choose which actions appear on linked hosts. This applies to your account only."
   }
 }

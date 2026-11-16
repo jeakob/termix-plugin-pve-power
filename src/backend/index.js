@@ -52,6 +52,8 @@ async function status(ctx, config) {
   return value;
 }
 
+// Per-user switches (manifest settings.user) for the host actions.
+const HOST_ACTION_SETTINGS = ["showControls", "showConnect", "showStart", "showStop"];
 const guestKey = config => `${config.hostId}:${config.type}:${config.node}:${config.vmid}`;
 
 export async function activate(ctx) {
@@ -185,13 +187,19 @@ export async function activate(ctx) {
    *       - Proxmox Power
    *     responses:
    *       200:
-   *         description: The saved guests
+   *         description: The saved guests, plus an actions map of which host actions this user has switched on
    *         content:
    *           application/json:
    *             schema:
    *               $ref: '#/components/schemas/PvePowerGuests'
    */
-  router.get("/vm", (_req, res) => res.json(view()));
+  router.get("/vm", async (_req, res) => {
+    const user = ctx.currentActor();
+    // Unset or unreadable settings count as shown, so a settings fault never hides the actions.
+    const actions = Object.fromEntries(await Promise.all(HOST_ACTION_SETTINGS.map(async key =>
+      [key, !user || await ctx.settings.getUser(user, key).catch(() => true) !== false])));
+    res.json({ ...view(), actions });
+  });
   /**
    * @openapi
    * /plugin-api/pve-power/refresh:
@@ -246,13 +254,13 @@ export async function activate(ctx) {
    *       - Proxmox Power
    *     responses:
    *       200:
-   *         description: Hosts with id, name and whether Proxmox Power is enabled on them
+   *         description: Hosts with id, name, address (ip) and whether Proxmox Power is enabled on them
    */
   router.get("/hosts", async (_req, res) => {
     try {
       const hosts = await ctx.hosts.list();
       // list() only carries a summary, so read this plugin's own host switch.
-      res.json(await Promise.all(hosts.map(async ({ id, name }) => ({ id, name, proxmox: await ctx.settings.getHost(id, "enabled") === true }))));
+      res.json(await Promise.all(hosts.map(async ({ id, name, ip }) => ({ id, name, ip, proxmox: await ctx.settings.getHost(id, "enabled") === true }))));
     } catch (error) { res.status(500).json({ error: error.message }); }
   });
   /**

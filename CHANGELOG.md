@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.0
+
+### Changed
+
+- Host actions now name the guest type: **Start LXC**, **Stop LXC** and **Start LXC + SSH** for containers, **Start VM**, **Stop VM** and **Start VM + SSH** for virtual machines, replacing the **PVE** wording.
+- Choosing a guest in setup now pre-selects the Termix connection host whose address matches the guest's Proxmox name. You can still change it, and nothing is pre-selected when no host or more than one host matches.
+- The connection host list shows each host's address and no longer offers hosts that are already linked to another guest.
+
+### Added
+
+- Choose which host actions appear. Each user can switch **PVE Power**, **Start + SSH**, **Start** and **Stop** on or off under **Host actions** in the Proxmox Power tab.
+- A saved guest with no connection host shows a **Link to …** button when a Termix host's address matches its Proxmox name.
+
+### Fixed
+
+- Host actions now appear or disappear right after you save or remove a guest, instead of up to 30 seconds later.
+
 ## 0.7.0
 
 ### Added

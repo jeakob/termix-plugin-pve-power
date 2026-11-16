@@ -26,6 +26,7 @@ test("host actions and mobile controls use the saved guest link", async () => {
   const slots = {};
   const toasts = [];
   let wakeTab;
+  let mainTab;
   let controlsTab;
   let effects = [];
   let hookState = [];
@@ -56,36 +57,59 @@ test("host actions and mobile controls use the saved guest link", async () => {
   const source = readFileSync(new URL("../src/frontend/index.js", import.meta.url), "utf8")
     .replace('import "./styles.css";\n', "")
     .replace('import React, { useEffect, useState } from "react";', 'const React = globalThis.__pveMocks.React; const { useEffect, useState } = React;')
-    .replace('import { usePermission, usePluginApi, useTranslation } from "@termix-ssh/plugin-sdk/frontend";', 'const { usePermission, usePluginApi, useTranslation } = globalThis.__pveMocks.frontend;')
+    .replace('import { usePermission, usePluginApi, useSettings, useTranslation } from "@termix-ssh/plugin-sdk/frontend";', 'const { usePermission, usePluginApi, useSettings, useTranslation } = globalThis.__pveMocks.frontend;')
     .replace('import { ListBadge, PanelShell } from "@termix-ssh/plugin-sdk/ui";', 'const { ListBadge, PanelShell } = globalThis.__pveMocks.ui;')
     .replace('import { toast } from "sonner";', 'const { toast } = globalThis.__pveMocks.sonner;');
   globalThis.__pveMocks = {
     React,
-    frontend: { usePermission() { return true; }, usePluginApi() { return api; }, useTranslation() { return { t }; } },
+    frontend: { usePermission() { return true; }, usePluginApi() { return api; }, useSettings() { return { values: { showStart: false }, loaded: true, save: async values => { calls.push(["settings", values]); } }; }, useTranslation() { return { t }; } },
     ui: { ListBadge() {}, PanelShell() {} },
     sonner: { toast: { success(text) { toasts.push(text); }, info(text) { toasts.push(text); }, error(text) { toasts.push(`error: ${text}`); } } },
   };
   globalThis.confirm = () => true;
   const module = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
   delete globalThis.__pveMocks;
+  const pool = [{ id: 26, ip: "Tiny-Debian301.home" }, { id: 28, ip: "pve.home" }, { id: 13, ip: "10.0.0.1" }, { id: 14, ip: "10.0.0.1" }];
+  assert.equal(module.matchHost(pool, [], "28", { name: "tiny-debian301.home" }), "26");
+  assert.equal(module.matchHost(pool, [], "28", { name: "10.0.0.1" }), "", "ambiguous address");
+  assert.equal(module.matchHost(pool, [], "28", { name: "pve.home" }), "", "the Proxmox host itself");
+  assert.equal(module.matchHost(pool, [{ config: { connectionHostId: 26 } }], "28", { name: "tiny-debian301.home" }), "", "already linked");
+  assert.equal(module.matchHost(pool, [], "28", undefined), "");
+  const listeners = {};
+  globalThis.addEventListener = (type, fn) => { listeners[type] = fn; };
   await module.activate({
     hasPermission: async () => false,
-    registerRailItem() {}, registerTab(type, component) { if (type.endsWith("-connect")) wakeTab = component; if (type === "Proxmox-Power-Controls") controlsTab = component; }, registerHostAction(value) { actions[value.id] = value; },
+    registerRailItem() {}, registerTab(type, component) { if (type === "pve-power") mainTab = component; if (type.endsWith("-connect")) wakeTab = component; if (type === "Proxmox-Power-Controls") controlsTab = component; }, registerHostAction(value) { actions[value.id] = value; },
     registerSlotContribution(id, value) { slots[id] = value; },
     api, t,
   });
-  const action = actions["pve-power.connect"];
+  delete globalThis.addEventListener;
+  const action = actions["pve-power.connect.lxc"];
   assert.equal(action.when({ id: 74, enableSsh: true }), true);
   assert.equal(action.when({ id: 62, enableSsh: true }), false);
   assert.equal(t(actions["pve-power.controls"].titleKey), "PVE Power");
   assert.equal(actions["pve-power.controls"].tabType, "Proxmox-Power-Controls");
   assert.equal(actions["pve-power.controls"].when({ id: 74 }), true);
-  assert.equal(t(action.titleKey), "Start PVE + SSH");
-  assert.equal(t(actions["pve-power.start"].titleKey), "Start PVE");
-  assert.equal(t(actions["pve-power.shutdown"].titleKey), "Stop PVE");
+  assert.equal(t(action.titleKey), "Start LXC + SSH");
+  assert.equal(t(actions["pve-power.start.lxc"].titleKey), "Start LXC");
+  assert.equal(t(actions["pve-power.shutdown.lxc"].titleKey), "Stop LXC");
   const tile = slots["host-page.tiles"];
   assert.equal(tile.actionId, "pve-power.controls");
   assert.equal(tile.when({ host: { id: 74 } }), true);
+  assert.equal(tile.when({ host: { id: 62 } }), false);
+  const savedGet = api.get;
+  api.get = async () => ({ data: { guests: [{ key: "62:lxc:pve:105", config: { connectionHostId: 62 } }] } });
+  await listeners["pve-power:links-changed"]();
+  assert.equal(tile.when({ host: { id: 62 } }), true, "a save refreshes the link cache at once");
+  // Per-user switches hide single actions; the other guest type's action never shows.
+  api.get = async () => ({ data: { ...(await savedGet()).data, actions: { showStart: false } } });
+  await listeners["pve-power:links-changed"]();
+  assert.equal(actions["pve-power.start.lxc"].when({ id: 74 }), false);
+  assert.equal(actions["pve-power.shutdown.lxc"].when({ id: 74 }), true);
+  assert.equal(actions["pve-power.shutdown.qemu"].when({ id: 74 }), false);
+  assert.equal(t(actions["pve-power.shutdown.qemu"].titleKey), "Stop VM");
+  api.get = savedGet;
+  await listeners["pve-power:links-changed"]();
   assert.equal(tile.when({ host: { id: 62 } }), false);
   const tileView = tile.component({ host: { id: 74 }, isVisible: true });
   assert.equal(tileView.type, controlsTab);
@@ -134,13 +158,13 @@ test("host actions and mobile controls use the saved guest link", async () => {
   assert.equal(calls.filter(call => Array.isArray(call)).length, 2);
 
   const terminals = calls.filter(call => call === "terminal").length;
-  await actions["pve-power.start"].run({ id: 74 });
+  await actions["pve-power.start.lxc"].run({ id: 74 });
   assert.equal(calls.at(-1)[0], "/start");
   assert.equal(calls.at(-1)[1].allowRunning, true);
   assert.equal(calls.filter(call => call === "terminal").length, terminals);
   assert.equal(toasts.at(-1), "Started CT 104");
 
-  const shutdown = actions["pve-power.shutdown"];
+  const shutdown = actions["pve-power.shutdown.lxc"];
   await shutdown.run({ id: 74, name: "Postiz" });
   assert.equal(shutdown.when({ id: 74 }), true);
   assert.equal(shutdown.when({ id: 75 }), false);
@@ -159,6 +183,23 @@ test("host actions and mobile controls use the saved guest link", async () => {
     calls.push([path, body]);
     return { data: { guests: [{ key: "62:lxc:pve:104", config: { hostId: 62, type: "lxc", vmid: 104, connectionHostId: 74 }, last: { status: path === "/refresh" ? "stopped" : path === "/start" ? "running" : path === "/restart" ? "restarting" : "stopping" } }] } };
   };
+  // Main tab: an unlinked saved guest offers a one-click link, and the dropdown hides hosts linked elsewhere.
+  const unlinked = { key: "28:lxc:pve:301", config: { hostId: 28, node: "pve", type: "lxc", vmid: 301, connectionHostId: null } };
+  const other = { key: "28:lxc:pve:104", config: { hostId: 28, node: "pve", type: "lxc", vmid: 104, connectionHostId: 39 } };
+  hookState = [{ guests: [unlinked, other] }, { hostId: "28", node: "", vmid: "", type: "qemu", connectionHostId: "", idleCpuPercent: "5", maxUptimeMinutes: "120" },
+    [{ id: 26, name: "Debian301", ip: "tiny-debian301.home" }, { id: 28, name: "Tiny PVE", ip: "pve.home" }, { id: 39, name: "Postiz", ip: "postiz.home" }],
+    [], { "28:lxc:pve:301": "tiny-debian301.home" }];
+  hookIndex = 0; effects = [];
+  const main = mainTab();
+  const flat = node => node && typeof node === "object" ? [node, ...node.children.flatMap(flat)] : [node];
+  const nodes = flat(main);
+  await nodes.find(node => node?.type === "button" && node.children.includes("Link to Debian301")).props.onClick();
+  assert.deepEqual(calls.find(call => call[0] === "/config"), ["/config", { ...unlinked.config, connectionHostId: 26 }]);
+  assert.deepEqual(nodes.filter(node => node?.type === "option" && node.props.value !== "" && typeof node.props.value === "number").map(node => node.children[0]), ["Debian301 · tiny-debian301.home"]);
+  const boxes = nodes.filter(node => node?.type === "input" && node.props.type === "checkbox");
+  assert.deepEqual(boxes.map(box => box.props.checked), [true, true, false, true]);
+  await boxes[3].props.onChange({ target: { checked: false } });
+  assert.deepEqual(calls.at(-1), ["settings", { showStart: false, showStop: false }]);
   hookState = [];
   const editor = { editHost(id) { calls.push(["editHost", id]); }, openHostEditor() { calls.push(["openHostEditor"]); } };
   const renderControls = () => { hookIndex = 0; effects = []; return controlsTab({ host: { id: 74, name: "Postiz" }, shell: editor }); };

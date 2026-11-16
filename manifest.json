@@ -1,7 +1,7 @@
 {
   "id": "pve-power",
   "name": "Proxmox Power",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Start Proxmox VMs and LXC containers on demand and shut them down after idle CPU use or a time limit.",
   "author": {
     "name": "jeakob",
@@ -82,7 +82,37 @@
         "enableKey": "enabled",
         "enableLabelKey": "settings.host.enabled.label",
         "fields": []
-      }
+      },
+      "user": [
+        {
+          "key": "showControls",
+          "type": "boolean",
+          "labelKey": "settings.user.showControls.label",
+          "descriptionKey": "settings.user.showControls.description",
+          "default": true
+        },
+        {
+          "key": "showConnect",
+          "type": "boolean",
+          "labelKey": "settings.user.showConnect.label",
+          "descriptionKey": "settings.user.showConnect.description",
+          "default": true
+        },
+        {
+          "key": "showStart",
+          "type": "boolean",
+          "labelKey": "settings.user.showStart.label",
+          "descriptionKey": "settings.user.showStart.description",
+          "default": true
+        },
+        {
+          "key": "showStop",
+          "type": "boolean",
+          "labelKey": "settings.user.showStop.label",
+          "descriptionKey": "settings.user.showStop.description",
+          "default": true
+        }
+      ]
     }
   },
   "locales": "locales",

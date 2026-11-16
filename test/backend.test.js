@@ -45,10 +45,10 @@ test("multiple guests keep separate start and shutdown state, including migrated
     }) },
     rbac: { require: () => () => {} },
     hosts: { checkAccess: async () => true, list: async () => [
-      { id: 1, name: "Proxmox" },
-      { id: 2, name: "Other SSH host" },
+      { id: 1, name: "Proxmox", ip: "pve.home" },
+      { id: 2, name: "Other SSH host", ip: "other.home" },
     ] },
-    settings: { getHost: async (id, key) => key === "enabled" && id === 1 },
+    settings: { getHost: async (id, key) => key === "enabled" && id === 1, getUser: async (_user, key) => key === "showStop" ? false : undefined },
     ssh: { connect: async () => ({ client, dispose() {} }) },
     schedule: { every(_ms, fn) { tick = fn; } },
     asUser: async (id, fn) => { impersonated.push(id); return fn(); },
@@ -68,9 +68,10 @@ test("multiple guests keep separate start and shutdown state, including migrated
   try {
     await activate(ctx);
     assert.deepEqual((await call("GET", "/hosts")).output, [
-      { id: 1, name: "Proxmox", proxmox: true },
-      { id: 2, name: "Other SSH host", proxmox: false },
+      { id: 1, name: "Proxmox", ip: "pve.home", proxmox: true },
+      { id: 2, name: "Other SSH host", ip: "other.home", proxmox: false },
     ]);
+    assert.deepEqual((await call("GET", "/vm")).output.actions, { showControls: true, showConnect: true, showStart: true, showStop: false });
     assert.deepEqual((await call("GET", "/vms?hostId=1")).output.map(guest => guest.name), ["Build VM", "Container"]);
     assert.equal((await call("POST", "/start", qemu)).code, 200);
     assert.equal((await call("POST", "/start", lxc)).code, 200);

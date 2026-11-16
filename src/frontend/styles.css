@@ -15,6 +15,8 @@
 .pve-section-head p { margin: 4px 0 0; color: var(--muted-foreground); font-size: .9em; }
 .pve-form, .pve-guest-list { display: grid; gap: 16px; }
 .pve-field { min-width: 0; display: grid; gap: 7px; font-size: .9em; font-weight: 600; }
+.pve-check { display: flex; align-items: center; gap: 10px; font-size: .9em; font-weight: 600; cursor: pointer; }
+.pve-check input { width: 18px; height: 18px; }
 .pve-field small { color: var(--muted-foreground); font-size: .82em; font-weight: 400; }
 .pve-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .pve-control { width: 100%; min-width: 0; min-height: 42px; padding: 9px 12px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 8px; color: inherit; font: inherit; }

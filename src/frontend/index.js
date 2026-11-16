@@ -1,6 +1,6 @@
 import "./styles.css";
 import React, { useEffect, useState } from "react";
-import { usePermission, usePluginApi, useTranslation } from "@termix-ssh/plugin-sdk/frontend";
+import { usePermission, usePluginApi, useSettings, useTranslation } from "@termix-ssh/plugin-sdk/frontend";
 import { ListBadge, PanelShell } from "@termix-ssh/plugin-sdk/ui";
 import { toast } from "sonner";
 
@@ -15,6 +15,14 @@ const Restart = icon("M20 11a8 8 0 1 0 1 4", "M20 4v7h-7");
 const Edit = icon("M12 20h9", "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z");
 const PlugZap = icon("M12 22v-5", "M9 8V2", "M15 8V2", "M18 8v4a6 6 0 0 1-12 0V8z", "m14 14-2 3h4l-2 3");
 const guestLabel = (t, { type, vmid }) => t(type === "lxc" ? "guest.lxc" : "guest.qemu", { vmid });
+
+// Pre-selects the connection host whose address is the guest's Proxmox name. Returns "" unless exactly one free host matches.
+export function matchHost(hosts, guests, hostId, guest) {
+  const name = guest?.name?.trim().toLowerCase();
+  const taken = new Set(guests.map(item => item.config.connectionHostId));
+  const found = name ? hosts.filter(host => String(host.id) !== String(hostId) && !taken.has(host.id) && host.ip?.trim().toLowerCase() === name) : [];
+  return found.length === 1 ? String(found[0].id) : "";
+}
 
 function WakeTab({ tab, host, shell, isFocusedPane }) {
   const { t } = useTranslation();
@@ -166,6 +174,7 @@ function VmTab() {
   const { t } = useTranslation();
   const api = usePluginApi();
   const canManage = usePermission("manage");
+  const prefs = useSettings("user");
   const [vm, setVm] = useState({ guests: [] });
   const [form, setForm] = useState({ hostId: "", node: "", vmid: "", type: "qemu", connectionHostId: "", idleCpuPercent: "5", maxUptimeMinutes: "120" });
   const [hosts, setHosts] = useState([]);
@@ -227,6 +236,7 @@ function VmTab() {
     try {
       const { data } = await api.post(path, body);
       setVm(data);
+      globalThis.dispatchEvent?.(new CustomEvent("pve-power:links-changed"));
       if (path === "/config") await refresh();
     } catch (error) {
       setMessage(error.response?.data?.error || error.message);
@@ -297,7 +307,7 @@ function VmTab() {
                 value: form.vmid ? `${form.type}/${form.node}/${form.vmid}` : "", disabled: working || !form.hostId,
                 onChange: event => {
                   const selected = vms.find(item => `${item.type}/${item.node}/${item.vmid}` === event.target.value);
-                  setForm({ ...form, type: selected?.type || "qemu", node: selected?.node || "", vmid: selected ? String(selected.vmid) : "", connectionHostId: "" });
+                  setForm({ ...form, type: selected?.type || "qemu", node: selected?.node || "", vmid: selected ? String(selected.vmid) : "", connectionHostId: matchHost(hosts, vm.guests || [], form.hostId, selected) });
                 } },
                 h("option", { value: "" }, t(form.hostId && !vms.length ? "setup.noGuests" : "setup.selectGuest")),
                 ...vms.map(item => h("option", { key: `${item.type}/${item.node}/${item.vmid}`, value: `${item.type}/${item.node}/${item.vmid}` },
@@ -309,7 +319,8 @@ function VmTab() {
               h("select", { className: control, value: form.connectionHostId, disabled: working,
                 onChange: event => setForm({ ...form, connectionHostId: event.target.value }) },
                 h("option", { value: "" }, t("setup.noAutoStart")),
-                ...hosts.filter(host => String(host.id) !== form.hostId).map(host => h("option", { key: host.id, value: host.id }, t("setup.hostOption", { name: host.name, id: host.id })))
+                ...hosts.filter(host => String(host.id) !== form.hostId && !guests.some(guest => guest !== selectedGuest && guest.config.connectionHostId === host.id))
+                  .map(host => h("option", { key: host.id, value: host.id }, host.ip ? t("setup.connectionOption", { name: host.name, address: host.ip }) : t("setup.hostOption", { name: host.name, id: host.id })))
               ),
               h("small", null, t("setup.connectionHelp"))),
             h("div", { className: "pve-field-grid" }, ...fields.map(([key, label]) => h("label", { key, className: "pve-field" },
@@ -341,6 +352,7 @@ function VmTab() {
               ? Math.max(0, guest.config.maxUptimeMinutes * 60 - uptimeSeconds) : null;
             const countdown = remaining === null ? null : `${Math.floor(remaining / 3600)}:${String(Math.floor(remaining % 3600 / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
             const guestId = guestLabel(t, guest.config);
+            const suggested = !guest.config.connectionHostId && !guest.armed && hosts.find(host => String(host.id) === matchHost(hosts, guests, guest.config.hostId, { name: guestNames[guest.key] }));
             return h("article", { key: guest.key, className: "pve-guest-card" },
               h("div", { className: "pve-guest-head" },
                 h("div", null,
@@ -365,11 +377,23 @@ function VmTab() {
                 !guest.armed && !stopping && !(running && !hasRule(guest.config)) && h("button", { type: "button", className: button, disabled: working, onClick: () => running ? monitor(guest) : send("/start", guest.config) }, t(running ? "actions.monitor" : "actions.start")),
                 running && !stopping && h("button", { type: "button", className: button, disabled: working, onClick: () => stop(guest) }, t("actions.stop")),
                 h("button", { type: "button", className: button, disabled: working, onClick: () => setForm(Object.fromEntries(Object.entries(guest.config).map(([key, value]) => [key, value == null ? "" : String(value)]))) }, t("actions.edit")),
+                suggested && h("button", { type: "button", className: button, disabled: working, onClick: () => send("/config", { ...guest.config, connectionHostId: suggested.id }) }, t("actions.link", { host: suggested.name || suggested.ip })),
                 guest.armed && h("button", { type: "button", className: button, disabled: working, onClick: () => send("/disarm", { key: guest.key }) }, t("actions.disarm")),
                 !guest.armed && h("button", { type: "button", className: button, disabled: working, onClick: () => send("/remove", { key: guest.key }) }, t("actions.remove"))
               )
             );
           })
+        ),
+        h("section", { className: "pve-panel" },
+          h("div", { className: "pve-section-head" },
+            h("h2", null, t("actionsPanel.title")),
+            h("p", null, t("actionsPanel.description"))),
+          h("div", { className: "pve-form" }, ...["showControls", "showConnect", "showStart", "showStop"].map(key => h("label", { key, className: "pve-check" },
+            h("input", { type: "checkbox", checked: prefs.values?.[key] !== false, disabled: !prefs.loaded,
+              onChange: event => prefs.save({ ...prefs.values, [key]: event.target.checked })
+                .then(() => globalThis.dispatchEvent?.(new CustomEvent("pve-power:links-changed")))
+                .catch(error => setMessage(error.response?.data?.error || error.message)) }),
+            t(`settings.user.${key}.label`))))
         )
       ),
       message && h("p", { role: "alert", className: "rounded-md border p-3 text-sm text-destructive" }, message)
@@ -385,19 +409,23 @@ export async function activate(app) {
 
   // Host action `when` must be synchronous, so keep a cached copy of the linked hosts.
   let links = new Map();
+  let shown = {}; // per-user switches for the host actions; a missing key means shown
   let fetchedAt = 0;
   function loadLinks() {
     fetchedAt = Date.now();
     return app.api.get("/vm").then(({ data }) => {
       const next = new Map((data.guests || []).filter(guest => guest.config.connectionHostId).map(guest => [guest.config.connectionHostId, guest]));
-      const changed = [...next.keys()].join() !== [...links.keys()].join();
+      const changed = JSON.stringify([[...next], data.actions]) !== JSON.stringify([[...links], shown]);
       links = next;
+      shown = data.actions || {};
       // The host list only re-evaluates `when` when it re-renders, so ask it to reload.
       // The SDK has no host-action invalidation API; this is the event Termix's own host list listens for.
       if (changed) globalThis.dispatchEvent?.(new CustomEvent("termix:hosts-changed"));
     }).catch(() => { fetchedAt = Date.now() - 25_000; });
   }
   loadLinks();
+  globalThis.addEventListener?.("pve-power:links-changed", loadLinks);
+  app.onSettingsChanged?.(loadLinks);
   const linked = host => {
     if (Date.now() - fetchedAt > 30_000) loadLinks();
     return links.has(Number(host.id));
@@ -409,43 +437,47 @@ export async function activate(app) {
   });
   app.registerHostAction({
     id: "pve-power.controls", titleKey: "hostAction.sidebar", icon: Power,
-    kind: "open", order: 10, tabType: "Proxmox-Power-Controls", when: linked,
+    kind: "open", order: 10, tabType: "Proxmox-Power-Controls", when: host => shown.showControls !== false && linked(host),
   });
-  app.registerHostAction({
-    id: "pve-power.connect", titleKey: "hostAction.title", icon: PlugZap,
-    kind: "open", order: 11, run: (host, shell) => shell.openTab(host, "pve-power-connect"),
-    when: host => Boolean(host.enableSsh) && linked(host),
-  });
-  app.registerHostAction({
-    id: "pve-power.start", titleKey: "hostAction.start", icon: Play, kind: "open", order: 12, when: linked,
-    run: async host => {
-      await loadLinks();
-      const guest = links.get(Number(host.id));
-      if (!guest) return toast.error(app.t("toast.notLinked"));
-      const name = guestLabel(app.t, guest.config);
-      try {
-        const { data } = await app.api.post("/start", { ...guest.config, allowRunning: true });
-        const started = data?.guests?.find(item => item.key === guest.key)?.last?.status === "starting";
-        toast.success(app.t(started ? "toast.started" : "toast.alreadyRunning", { guest: name }));
-      } catch (error) {
-        toast.error(error.response?.data?.error || error.message);
-      }
-    },
-  });
-  app.registerHostAction({
-    id: "pve-power.shutdown", titleKey: "hostAction.shutdown", icon: Stop, kind: "open", order: 13, when: linked,
-    run: async host => {
-      await loadLinks();
-      const guest = links.get(Number(host.id));
-      if (!guest) return toast.error(app.t("toast.notLinked"));
-      const name = guestLabel(app.t, guest.config);
-      if (!globalThis.confirm(app.t("confirm.hostStop", { guest: name, host: host.name || app.t("confirm.thisHost") }))) return;
-      try {
-        await app.api.post("/stop", { key: guest.key });
-        toast.success(app.t("toast.stopRequested", { guest: name }));
-      } catch (error) {
-        toast.error(error.response?.data?.error || error.message);
-      }
-    },
-  });
+  // titleKey is static, so each action is registered once per guest type to say LXC or VM.
+  for (const [type, name] of [["lxc", "Lxc"], ["qemu", "Vm"]]) {
+    const mine = (host, setting) => shown[setting] !== false && linked(host) && links.get(Number(host.id)).config.type === type;
+    app.registerHostAction({
+      id: `pve-power.connect.${type}`, titleKey: `hostAction.connect${name}`, icon: PlugZap,
+      kind: "open", order: 11, run: (host, shell) => shell.openTab(host, "pve-power-connect"),
+      when: host => Boolean(host.enableSsh) && mine(host, "showConnect"),
+    });
+    app.registerHostAction({
+      id: `pve-power.start.${type}`, titleKey: `hostAction.start${name}`, icon: Play, kind: "open", order: 12, when: host => mine(host, "showStart"),
+      run: async host => {
+        await loadLinks();
+        const guest = links.get(Number(host.id));
+        if (!guest) return toast.error(app.t("toast.notLinked"));
+        const name = guestLabel(app.t, guest.config);
+        try {
+          const { data } = await app.api.post("/start", { ...guest.config, allowRunning: true });
+          const started = data?.guests?.find(item => item.key === guest.key)?.last?.status === "starting";
+          toast.success(app.t(started ? "toast.started" : "toast.alreadyRunning", { guest: name }));
+        } catch (error) {
+          toast.error(error.response?.data?.error || error.message);
+        }
+      },
+    });
+    app.registerHostAction({
+      id: `pve-power.shutdown.${type}`, titleKey: `hostAction.shutdown${name}`, icon: Stop, kind: "open", order: 13, when: host => mine(host, "showStop"),
+      run: async host => {
+        await loadLinks();
+        const guest = links.get(Number(host.id));
+        if (!guest) return toast.error(app.t("toast.notLinked"));
+        const name = guestLabel(app.t, guest.config);
+        if (!globalThis.confirm(app.t("confirm.hostStop", { guest: name, host: host.name || app.t("confirm.thisHost") }))) return;
+        try {
+          await app.api.post("/stop", { key: guest.key });
+          toast.success(app.t("toast.stopRequested", { guest: name }));
+        } catch (error) {
+          toast.error(error.response?.data?.error || error.message);
+        }
+      },
+    });
+  }
 }
