@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+
+### Changed
+
+- Needs Termix 26.11.1 or later instead of 26.11.2. The plugin only uses plugin API 2.1, so it now asks for that.
+
 ## 0.8.1
 
 ### Changed
