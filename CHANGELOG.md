@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.3
+
+### Fixed
+
+- Fixed the plugin failing to start ("did not start: EACCES: permission denied, open '.../pve-power/vm.json'") after upgrading from 0.8.0 or earlier. Those versions saved your guests as the Termix server's user. Since 0.8.1 the plugin runs as its own user and could not read that file.
+- When the saved file cannot be read, the plugin now starts with no guests, keeps the old file as `vm.json.unreadable-*` so it cannot be overwritten, and shows a warning in the Proxmox Power tab.
+- To get your saved guests back, run this once, before adding guests again, then restart the plugin. `/app/data` is the default Docker data folder; replace `<termix-container>` with your container name: `docker exec -u 0 <termix-container> sh -c 'cd /app/data/plugin-data/pve-power && chown --reference=. vm.json.unreadable-* && mv vm.json.unreadable-* vm.json'`
+- A leftover temporary state file that the plugin cannot write no longer blocks saving.
+
 ## 0.8.2
 
 ### Changed

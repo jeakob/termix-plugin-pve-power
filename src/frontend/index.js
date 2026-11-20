@@ -283,6 +283,7 @@ function VmTab() {
           h("p", null, t("webhooks.routes")),
           h("p", null, t("webhooks.headers")))),
       backendOutdated && h("p", { role: "alert", className: "rounded-md border p-3 text-sm" }, t("tab.outdated")),
+      vm?.stateWarning && h("p", { role: "alert", className: "rounded-md border p-3 text-sm text-destructive" }, t("tab.stateWarning", { file: vm.stateWarning })),
       h("div", { className: "pve-layout" },
         canManage && !backendOutdated && h("section", { className: "pve-panel" },
           h("div", { className: "pve-section-head" },

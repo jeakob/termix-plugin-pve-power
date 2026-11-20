@@ -1,4 +1,4 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { evaluate, hasShutdownRule, validateConfig } from "./policy.js";
 
@@ -57,14 +57,24 @@ const HOST_ACTION_SETTINGS = ["showControls", "showConnect", "showStart", "showS
 const guestKey = config => `${config.hostId}:${config.type}:${config.node}:${config.vmid}`;
 
 export async function activate(ctx) {
-  const statePath = join(await ctx.files.dataDir(), "vm.json");
+  const dataDir = await ctx.files.dataDir();
+  const statePath = join(dataDir, "vm.json");
   let stored;
   try {
     stored = JSON.parse(await readFile(statePath, "utf8"));
   } catch (error) {
-    if (error.code !== "ENOENT") throw error;
+    // Unreadable state (e.g. a file left by an older root-run plugin) must not stop startup.
+    if (error.code === "EACCES" || error.code === "EPERM") {
+      // Keep the old file for an admin to restore; renaming needs write access to the folder, not the file.
+      const kept = `${statePath}.unreadable-${Date.now()}`;
+      await rename(statePath, kept).then(
+        () => ctx.log.warn(`Cannot read ${statePath} (${error.code}); moved it to ${kept} and started empty.`),
+        () => ctx.log.warn(`Cannot read ${statePath} (${error.code}) and could not move it; started empty. Fix its owner.`));
+    } else if (error.code !== "ENOENT") throw error;
     stored = {};
   }
+  // Outlasts restarts: the banner stays until an admin restores or deletes the kept file.
+  const stateWarning = (await readdir(dataDir).catch(() => [])).find(name => name.startsWith("vm.json.unreadable-")) || null;
   const guests = Array.isArray(stored.guests) ? stored.guests : stored.config ? [{ config: stored.config, armed: stored.armed, last: stored.last }] : [];
   const state = { guests: guests.map(guest => {
     const config = validateConfig(guest.config);
@@ -74,6 +84,7 @@ export async function activate(ctx) {
 
   async function save() {
     const temp = `${statePath}.tmp`;
+    await rm(temp, { force: true }); // a stale temp file owned by another user would make the write fail
     await writeFile(temp, JSON.stringify(state), { mode: 0o600 });
     await rename(temp, statePath);
   }
@@ -167,6 +178,7 @@ export async function activate(ctx) {
    *     PvePowerGuests:
    *       type: object
    *       properties:
+   *         stateWarning: { type: string, nullable: true, description: Name of the kept unreadable state file when saved guests could not be loaded }
    *         guests:
    *           type: array
    *           items:
@@ -198,7 +210,7 @@ export async function activate(ctx) {
     // Unset or unreadable settings count as shown, so a settings fault never hides the actions.
     const actions = Object.fromEntries(await Promise.all(HOST_ACTION_SETTINGS.map(async key =>
       [key, !user || await ctx.settings.getUser(user, key).catch(() => true) !== false])));
-    res.json({ ...view(), actions });
+    res.json({ ...view(), actions, stateWarning });
   });
   /**
    * @openapi

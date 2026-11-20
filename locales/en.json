@@ -2,6 +2,7 @@
   "tab": {
     "title": "Proxmox Power",
     "intro": "Start a saved VM or container, or monitor one already running. Automatic shutdown uses five low CPU checks after 10 minutes, or the uptime limit you set.",
+    "stateWarning": "Saved guests could not be loaded because the plugin may not read its saved state file. The file was kept as {{file}} in the plugin's data folder (plugin-data/pve-power). To restore your guests before adding new ones, run in that folder: chown --reference=. {{file}} && mv {{file}} vm.json, then restart the plugin. Delete the kept file if you do not need it, which clears this message.",
     "outdated": "Termix is still running an older plugin backend. Restart the Termix server to load this update."
   },
   "webhooks": {
